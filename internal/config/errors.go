@@ -3,6 +3,9 @@ package config
 import "errors"
 
 var (
+	// ErrJWTSecretTooShort indicates a signing key below 32 bytes.
+	ErrJWTSecretTooShort = errors.New("JWT_SECRET must contain at least 32 bytes")
+
 	// ErrConfigNil indicates a missing configuration.
 	ErrConfigNil = errors.New("configuration is nil")
 

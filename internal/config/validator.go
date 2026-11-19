@@ -20,8 +20,8 @@ func NewValidator() *Validator {
 	return &Validator{}
 }
 
-// Validate returns the first error in listen address, database URI, accrual address
-// order. Error wrappers describe actions; underlying errors never contain credentials.
+// Validate returns the first error in listen address, database URI, accrual address,
+// then JWT secret order. Error wrappers describe actions; underlying errors never contain credentials.
 func (v *Validator) Validate(cfg *Config) error {
 	if cfg == nil {
 		return ErrConfigNil
@@ -37,6 +37,10 @@ func (v *Validator) Validate(cfg *Config) error {
 
 	if err := v.validateAccrualAddress(cfg.AccrualSystemAddress); err != nil {
 		return fmt.Errorf("validate accrual address: %w", err)
+	}
+
+	if len(cfg.JWTSecret) < MinJWTSecretBytes {
+		return fmt.Errorf("validate JWT secret: %w", ErrJWTSecretTooShort)
 	}
 
 	return nil

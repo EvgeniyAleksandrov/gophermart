@@ -11,6 +11,7 @@ import (
 
 	"github.com/EvgeniyAleksandrov/gophermart/internal/server"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
 )
@@ -19,7 +20,7 @@ func TestServerTimeoutsAndBind(t *testing.T) {
 	httpServer, err := server.NewServerBuilder("127.0.0.1:0").Build()
 	require.NoError(t, err)
 
-	application := NewApp(&stubBuilder{server: httpServer}, zap.NewNop())
+	application := NewApp(httpServer, zap.NewNop(), newIdleStorage(t))
 	require.Equal(t, 5*time.Second, httpServer.ReadHeaderTimeout)
 	require.Equal(t, 10*time.Second, httpServer.ReadTimeout)
 	require.Equal(t, 30*time.Second, httpServer.WriteTimeout)
@@ -68,7 +69,7 @@ func TestServerShutdown(t *testing.T) {
 				Addr:    "127.0.0.1:0",
 				Handler: handler,
 			}
-			application := NewApp(&stubBuilder{server: httpServer}, zap.NewNop())
+			application := NewApp(httpServer, zap.NewNop(), newIdleStorage(t))
 			if tc.forced {
 				application.shutdownTimeout = 20 * time.Millisecond
 			}
@@ -79,7 +80,7 @@ func TestServerShutdown(t *testing.T) {
 			ctx, cancel := contextWithCleanup(t)
 			done := make(chan error, 1)
 			go func() {
-				done <- application.serve(ctx, httpServer, listener)
+				done <- application.serve(ctx, listener)
 			}()
 
 			client := &http.Client{Timeout: time.Second}
@@ -146,45 +147,30 @@ func TestUnexpectedServeFailure(t *testing.T) {
 	require.NoError(t, listener.Close())
 
 	httpServer := &http.Server{Handler: http.NotFoundHandler()}
-	application := NewApp(&stubBuilder{server: httpServer}, zap.NewNop())
+	application := NewApp(httpServer, zap.NewNop(), newIdleStorage(t))
 
-	require.Error(t, application.serve(context.Background(), httpServer, listener))
+	require.Error(t, application.serve(context.Background(), listener))
 }
 
-func TestAppBuildFailureAndCancellation(t *testing.T) {
-	failure := errors.New("builder failed")
-	builder := &stubBuilder{err: failure}
-	application := NewApp(builder, zap.NewNop())
-	require.ErrorIs(t, application.Run(context.Background()), failure)
-	require.Equal(t, 1, builder.calls)
-
+func TestAppCancellation(t *testing.T) {
+	storage := NewMockStorage(gomock.NewController(t))
+	storage.EXPECT().Close().Return(nil)
+	// An invalid address proves an already canceled Run does not open a listener.
+	httpServer := &http.Server{Addr: "invalid address"}
+	application := NewApp(httpServer, zap.NewNop(), storage)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	require.ErrorIs(t, application.Run(ctx), failure)
-	require.Equal(t, 2, builder.calls)
-
-	builder = &stubBuilder{
-		server: &http.Server{
-			Addr:    "127.0.0.1:0",
-			Handler: http.NotFoundHandler(),
-		},
-	}
-	application = NewApp(builder, zap.NewNop())
-
 	require.NoError(t, application.Run(ctx))
-	require.Equal(t, 1, builder.calls)
 }
 
 func TestAppRun(t *testing.T) {
 	core, logs := observer.New(zap.InfoLevel)
-	builder := &stubBuilder{
-		server: &http.Server{
-			Addr:    "127.0.0.1:0",
-			Handler: http.NotFoundHandler(),
-		},
+	httpServer := &http.Server{
+		Addr:    "127.0.0.1:0",
+		Handler: http.NotFoundHandler(),
 	}
-	application := NewApp(builder, zap.New(core))
+	application := NewApp(httpServer, zap.New(core), newIdleStorage(t))
 
 	ctx, cancel := contextWithCleanup(t)
 	done := make(chan error, 1)
@@ -206,7 +192,6 @@ func TestAppRun(t *testing.T) {
 	cancel()
 
 	require.NoError(t, <-done)
-	require.Equal(t, 1, builder.calls)
 }
 
 func TestNormalServerClose(t *testing.T) {
@@ -215,9 +200,81 @@ func TestNormalServerClose(t *testing.T) {
 	httpServer := &http.Server{}
 	require.NoError(t, httpServer.Close())
 
-	application := NewApp(&stubBuilder{server: httpServer}, zap.NewNop())
+	application := NewApp(httpServer, zap.NewNop(), newIdleStorage(t))
 
-	require.NoError(t, application.serve(context.Background(), httpServer, listener))
+	require.NoError(t, application.serve(context.Background(), listener))
+}
+
+func TestAppStorageCloseFailure(t *testing.T) {
+	failure := errors.New("close failed")
+	storage := NewMockStorage(gomock.NewController(t))
+	storage.EXPECT().Close().Return(failure)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := NewApp(&http.Server{}, zap.NewNop(), storage).Run(ctx)
+	require.ErrorIs(t, err, failure)
+}
+
+func TestAppClosesStorageAfterHTTP(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	storage := NewMockStorage(ctrl)
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	exited := make(chan struct{})
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(entered)
+		<-release
+		close(exited)
+	})
+	httpServer := &http.Server{Addr: "127.0.0.1:0", Handler: handler}
+	core, logs := observer.New(zap.InfoLevel)
+	storage.EXPECT().Close().DoAndReturn(func() error {
+		select {
+		case <-exited:
+		default:
+			t.Error("storage closed before handler finished")
+		}
+		return nil
+	})
+	ctx, cancel := contextWithCleanup(t)
+	done := make(chan error, 1)
+	go func() { done <- NewApp(httpServer, zap.New(core), storage).Run(ctx) }()
+	require.Eventually(t, func() bool { return logs.Len() > 0 }, time.Second, time.Millisecond)
+	address, ok := logs.All()[0].ContextMap()["address"].(string)
+	require.True(t, ok)
+	responseDone := make(chan struct{})
+	go func() {
+		defer close(responseDone)
+		client := &http.Client{Timeout: 2 * time.Second}
+		response, err := client.Get("http://" + address)
+		if err == nil {
+			response.Body.Close()
+		}
+	}()
+	select {
+	case <-entered:
+	case <-ctx.Done():
+		t.Fatal("request did not start")
+	}
+	cancel()
+	select {
+	case <-done:
+		t.Fatal("application stopped with an active handler")
+	default:
+	}
+	close(release)
+	require.NoError(t, <-done)
+	<-responseDone
+}
+
+func TestAppClosesStorageOnListenFailure(t *testing.T) {
+	storage := NewMockStorage(gomock.NewController(t))
+	storage.EXPECT().Close().Return(nil)
+	httpServer := &http.Server{Addr: "invalid address"}
+
+	err := NewApp(httpServer, zap.NewNop(), storage).Run(context.Background())
+	require.ErrorContains(t, err, "listen HTTP")
 }
 
 func contextWithCleanup(t *testing.T) (context.Context, context.CancelFunc) {
@@ -229,14 +286,9 @@ func contextWithCleanup(t *testing.T) (context.Context, context.CancelFunc) {
 	return ctx, cancel
 }
 
-type stubBuilder struct {
-	server *http.Server
-	err    error
-	calls  int
-}
-
-func (b *stubBuilder) Build() (*http.Server, error) {
-	b.calls++
-
-	return b.server, b.err
+func newIdleStorage(t *testing.T) *MockStorage {
+	t.Helper()
+	storage := NewMockStorage(gomock.NewController(t))
+	storage.EXPECT().Close().Return(nil).AnyTimes()
+	return storage
 }

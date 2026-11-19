@@ -1,7 +1,9 @@
-package config
+package config_test
 
 import (
 	"testing"
+
+	"github.com/EvgeniyAleksandrov/gophermart/internal/config"
 
 	"github.com/stretchr/testify/require"
 )
@@ -198,9 +200,10 @@ func TestValidator(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			cfg := Config{
+			cfg := config.Config{
 				RunAddress:           ":8080",
 				DatabaseURI:          testDSN,
+				JWTSecret:            "12345678901234567890123456789012",
 				AccrualSystemAddress: "http://localhost:8081",
 			}
 
@@ -213,7 +216,7 @@ func TestValidator(t *testing.T) {
 				cfg.AccrualSystemAddress = tc.value
 			}
 
-			err := NewValidator().Validate(&cfg)
+			err := config.NewValidator().Validate(&cfg)
 
 			if !tc.valid {
 				require.Error(t, err)
@@ -236,130 +239,131 @@ func TestValidatorErrorReasons(t *testing.T) {
 		"empty run": {
 			field: "run",
 			value: "",
-			want:  ErrRunAddressEmpty,
+			want:  config.ErrRunAddressEmpty,
 		},
 		"run whitespace": {
 			field: "run",
 			value: " :80",
-			want:  ErrRunAddressWhitespace,
+			want:  config.ErrRunAddressWhitespace,
 		},
 		"run syntax": {
 			field: "run",
 			value: "http://localhost:80",
-			want:  ErrRunAddressFormat,
+			want:  config.ErrRunAddressFormat,
 		},
 		"run IP": {
 			field: "run",
 			value: "[xyz]:80",
-			want:  ErrRunAddressInvalidIP,
+			want:  config.ErrRunAddressInvalidIP,
 		},
 		"port empty": {
 			field: "run",
 			value: "localhost:",
-			want:  ErrPortEmpty,
+			want:  config.ErrPortEmpty,
 		},
 		"port text": {
 			field: "run",
 			value: "localhost:x",
-			want:  ErrPortNotNumeric,
+			want:  config.ErrPortNotNumeric,
 		},
 		"port range": {
 			field: "run",
 			value: "localhost:65536",
-			want:  ErrPortOutOfRange,
+			want:  config.ErrPortOutOfRange,
 		},
 		"port overflow": {
 			field: "run",
 			value: "localhost:999999999999999999999999",
-			want:  ErrPortOutOfRange,
+			want:  config.ErrPortOutOfRange,
 		},
 		"empty db": {
 			field: "db",
 			value: " ",
-			want:  ErrDatabaseURIEmpty,
+			want:  config.ErrDatabaseURIEmpty,
 		},
 		"db scheme": {
 			field: "db",
 			value: "https://localhost",
-			want:  ErrDatabaseSchemeUnsupported,
+			want:  config.ErrDatabaseSchemeUnsupported,
 		},
 		"db syntax": {
 			field: "db",
 			value: "password='secret",
-			want:  ErrDatabaseURIInvalid,
+			want:  config.ErrDatabaseURIInvalid,
 		},
 		"db sslmode": {
 			field: "db",
 			value: testDSN + " sslmode=bad",
-			want:  ErrDatabaseURIInvalid,
+			want:  config.ErrDatabaseURIInvalid,
 		},
 		"empty accrual": {
 			field: "accrual",
 			value: "",
-			want:  ErrAccrualAddressEmpty,
+			want:  config.ErrAccrualAddressEmpty,
 		},
 		"accrual syntax": {
 			field: "accrual",
 			value: "http://secret%zz",
-			want:  ErrAccrualAddressInvalid,
+			want:  config.ErrAccrualAddressInvalid,
 		},
 		"accrual scheme": {
 			field: "accrual",
 			value: "ftp://localhost",
-			want:  ErrAccrualScheme,
+			want:  config.ErrAccrualScheme,
 		},
 		"accrual host": {
 			field: "accrual",
 			value: "http:///",
-			want:  ErrAccrualHostEmpty,
+			want:  config.ErrAccrualHostEmpty,
 		},
 		"accrual credentials": {
 			field: "accrual",
 			value: "http://u:secret@localhost",
-			want:  ErrAccrualCredentials,
+			want:  config.ErrAccrualCredentials,
 		},
 		"accrual path": {
 			field: "accrual",
 			value: "http://localhost/api",
-			want:  ErrAccrualPath,
+			want:  config.ErrAccrualPath,
 		},
 		"accrual query": {
 			field: "accrual",
 			value: "http://localhost?",
-			want:  ErrAccrualQuery,
+			want:  config.ErrAccrualQuery,
 		},
 		"accrual fragment": {
 			field: "accrual",
 			value: "http://localhost#",
-			want:  ErrAccrualFragment,
+			want:  config.ErrAccrualFragment,
 		},
 		"accrual whitespace": {
 			field: "accrual",
 			value: " http://localhost",
-			want:  ErrAccrualWhitespace,
+			want:  config.ErrAccrualWhitespace,
 		},
 		"accrual IP": {
 			field: "accrual",
 			value: "http://[xyz]",
-			want:  ErrAccrualAddressInvalid,
+			want:  config.ErrAccrualAddressInvalid,
 		},
 		"accrual port": {
 			field: "accrual",
 			value: "http://localhost:",
-			want:  ErrPortEmpty,
+			want:  config.ErrPortEmpty,
 		},
 		"accrual port range": {
 			field: "accrual",
 			value: "http://localhost:65536",
-			want:  ErrPortOutOfRange,
+			want:  config.ErrPortOutOfRange,
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			cfg := &Config{
+			cfg := &config.Config{
 				RunAddress:           ":8080",
 				DatabaseURI:          testDSN,
+				JWTSecret:            "12345678901234567890123456789012",
 				AccrualSystemAddress: "http://localhost",
 			}
 
@@ -372,14 +376,14 @@ func TestValidatorErrorReasons(t *testing.T) {
 				cfg.AccrualSystemAddress = tc.value
 			}
 
-			err := NewValidator().Validate(cfg)
+			err := config.NewValidator().Validate(cfg)
 			require.ErrorIs(t, err, tc.want)
 			require.NotContains(t, err.Error(), "secret")
 		})
 	}
 
-	require.ErrorIs(t, NewValidator().Validate(nil), ErrConfigNil)
-	cfg := &Config{RunAddress: ":65536"}
-	err := NewValidator().Validate(cfg)
+	require.ErrorIs(t, config.NewValidator().Validate(nil), config.ErrConfigNil)
+	cfg := &config.Config{RunAddress: ":65536"}
+	err := config.NewValidator().Validate(cfg)
 	require.EqualError(t, err, "validate run address: validate port: port must be between 1 and 65535")
 }

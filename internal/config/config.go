@@ -1,24 +1,30 @@
 package config
 
 import (
+	"crypto/rand"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
 	"github.com/caarlos0/env/v11"
 )
 
-// Config contains the selected application addresses. DatabaseURI may contain credentials.
+// MinJWTSecretBytes is the minimum length of a JWT signing key in bytes.
+const MinJWTSecretBytes = 32
+
+// Config contains application settings. DatabaseURI and JWTSecret contain secrets.
 type Config struct {
 	RunAddress           string `env:"RUN_ADDRESS"`
 	DatabaseURI          string `env:"DATABASE_URI"`
 	AccrualSystemAddress string `env:"ACCRUAL_SYSTEM_ADDRESS"`
+	JWTSecret            string `env:"JWT_SECRET"`
 }
 
 // LoadConfig reads process environment and arguments, applies explicit flags over
-// environment values, and validates the result. Call once at process startup.
+// environment values, prepares a random JWT secret when empty, and validates the result. Call once at process startup.
 // The global flag parser handles help and exits on malformed flags before returning.
 func LoadConfig() (*Config, error) {
 	cfg := &Config{}
@@ -44,6 +50,15 @@ func LoadConfig() (*Config, error) {
 
 	if flag.NArg() != 0 {
 		return nil, errors.New("parse flags: positional arguments are not supported")
+	}
+
+	if cfg.JWTSecret == "" {
+		key := make([]byte, MinJWTSecretBytes)
+		if _, err := io.ReadFull(rand.Reader, key); err != nil {
+			return nil, fmt.Errorf("generate JWT secret: %w", err)
+		}
+
+		cfg.JWTSecret = string(key)
 	}
 
 	if err := NewValidator().Validate(cfg); err != nil {
