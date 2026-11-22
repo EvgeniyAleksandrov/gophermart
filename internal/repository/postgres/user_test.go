@@ -1,4 +1,4 @@
-package postgres
+package postgres_test
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/EvgeniyAleksandrov/gophermart/internal/model"
+	"github.com/EvgeniyAleksandrov/gophermart/internal/repository/postgres"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/require"
 )
@@ -127,7 +128,7 @@ func TestDBStorageAddUser(t *testing.T) {
 				}
 			}
 
-			user, err := NewDBStorage(db).AddUser(context.Background(), "Alice", "hash")
+			user, err := postgres.NewDBStorage(db).AddUser(context.Background(), "Alice", "hash")
 			if tc.wantErr != nil || tc.scanError {
 				require.Error(t, err)
 				require.Equal(t, model.User{}, user)
@@ -185,7 +186,7 @@ func TestDBStorageFindUserByLogin(t *testing.T) {
 				query.WillReturnRows(tc.rows)
 			}
 
-			user, err := NewDBStorage(db).FindUserByLogin(context.Background(), " Alice ")
+			user, err := postgres.NewDBStorage(db).FindUserByLogin(context.Background(), " Alice ")
 			if tc.wantErr != nil || tc.scanError {
 				require.Error(t, err)
 				require.Equal(t, model.User{}, user)
@@ -197,6 +198,57 @@ func TestDBStorageFindUserByLogin(t *testing.T) {
 				require.Equal(t, model.User{ID: 42, Login: " Alice ", PasswordHash: "hash"}, user)
 			}
 
+			require.NoError(t, mock.ExpectationsWereMet())
+		})
+	}
+}
+
+func TestDBStorageUserExists(t *testing.T) {
+	queryErr := errors.New("query failed")
+	tests := map[string]struct {
+		value    any
+		queryErr error
+		want     bool
+		wantErr  bool
+	}{
+		"present": {
+			value: true,
+			want:  true,
+		},
+		"missing": {
+			value: false,
+		},
+		"query failure": {
+			queryErr: queryErr,
+			wantErr:  true,
+		},
+		"scan failure": {
+			value:   "invalid boolean",
+			wantErr: true,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			db, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			defer db.Close()
+			query := mock.ExpectQuery(regexp.QuoteMeta(`SELECT EXISTS (SELECT 1 FROM public.gophermart_users WHERE id = $1)`)).WithArgs(int64(7))
+			if tc.queryErr != nil {
+				query.WillReturnError(tc.queryErr)
+			} else {
+				query.WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(tc.value))
+			}
+
+			got, err := postgres.NewDBStorage(db).UserExists(context.Background(), 7)
+			require.Equal(t, tc.want, got)
+			if tc.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			if tc.queryErr != nil {
+				require.ErrorIs(t, err, tc.queryErr)
+			}
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}

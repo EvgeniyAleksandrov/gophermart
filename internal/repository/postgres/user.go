@@ -69,3 +69,15 @@ func (s *DBStorage) FindUserByLogin(ctx context.Context, login string) (model.Us
 
 	return user, nil
 }
+
+// UserExists checks only the user's primary key, without reading credentials.
+func (s *DBStorage) UserExists(ctx context.Context, userID int64) (bool, error) {
+	var exists bool
+	err := s.db.QueryRowContext(ctx, `
+ SELECT EXISTS (SELECT 1 FROM public.gophermart_users WHERE id = $1)`, userID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("check user existence: %w", err)
+	}
+
+	return exists, nil
+}

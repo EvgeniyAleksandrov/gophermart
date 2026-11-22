@@ -41,6 +41,21 @@ func (m *MockDBStorage) EXPECT() *MockDBStorageMockRecorder {
 	return m.recorder
 }
 
+// AddOrder mocks base method.
+func (m *MockDBStorage) AddOrder(ctx context.Context, userID int64, number string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddOrder", ctx, userID, number)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AddOrder indicates an expected call of AddOrder.
+func (mr *MockDBStorageMockRecorder) AddOrder(ctx, userID, number any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddOrder", reflect.TypeOf((*MockDBStorage)(nil).AddOrder), ctx, userID, number)
+}
+
 // AddUser mocks base method.
 func (m *MockDBStorage) AddUser(ctx context.Context, login, passwordHash string) (model.User, error) {
 	m.ctrl.T.Helper()
@@ -69,4 +84,34 @@ func (m *MockDBStorage) FindUserByLogin(ctx context.Context, login string) (mode
 func (mr *MockDBStorageMockRecorder) FindUserByLogin(ctx, login any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindUserByLogin", reflect.TypeOf((*MockDBStorage)(nil).FindUserByLogin), ctx, login)
+}
+
+// ListOrdersByUser mocks base method.
+func (m *MockDBStorage) ListOrdersByUser(ctx context.Context, userID int64) ([]model.Order, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListOrdersByUser", ctx, userID)
+	ret0, _ := ret[0].([]model.Order)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListOrdersByUser indicates an expected call of ListOrdersByUser.
+func (mr *MockDBStorageMockRecorder) ListOrdersByUser(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListOrdersByUser", reflect.TypeOf((*MockDBStorage)(nil).ListOrdersByUser), ctx, userID)
+}
+
+// UserExists mocks base method.
+func (m *MockDBStorage) UserExists(ctx context.Context, userID int64) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UserExists", ctx, userID)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UserExists indicates an expected call of UserExists.
+func (mr *MockDBStorageMockRecorder) UserExists(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserExists", reflect.TypeOf((*MockDBStorage)(nil).UserExists), ctx, userID)
 }

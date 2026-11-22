@@ -13,6 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	model "github.com/EvgeniyAleksandrov/gophermart/internal/model"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -68,4 +69,58 @@ func (m *MockAuthService) Register(ctx context.Context, login, password string) 
 func (mr *MockAuthServiceMockRecorder) Register(ctx, login, password any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockAuthService)(nil).Register), ctx, login, password)
+}
+
+// MockOrderService is a mock of OrderService interface.
+type MockOrderService struct {
+	ctrl     *gomock.Controller
+	recorder *MockOrderServiceMockRecorder
+	isgomock struct{}
+}
+
+// MockOrderServiceMockRecorder is the mock recorder for MockOrderService.
+type MockOrderServiceMockRecorder struct {
+	mock *MockOrderService
+}
+
+// NewMockOrderService creates a new mock instance.
+func NewMockOrderService(ctrl *gomock.Controller) *MockOrderService {
+	mock := &MockOrderService{ctrl: ctrl}
+	mock.recorder = &MockOrderServiceMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockOrderService) EXPECT() *MockOrderServiceMockRecorder {
+	return m.recorder
+}
+
+// List mocks base method.
+func (m *MockOrderService) List(ctx context.Context, userID int64) ([]model.Order, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "List", ctx, userID)
+	ret0, _ := ret[0].([]model.Order)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// List indicates an expected call of List.
+func (mr *MockOrderServiceMockRecorder) List(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockOrderService)(nil).List), ctx, userID)
+}
+
+// Upload mocks base method.
+func (m *MockOrderService) Upload(ctx context.Context, userID int64, rawNumber string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Upload", ctx, userID, rawNumber)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Upload indicates an expected call of Upload.
+func (mr *MockOrderServiceMockRecorder) Upload(ctx, userID, rawNumber any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upload", reflect.TypeOf((*MockOrderService)(nil).Upload), ctx, userID, rawNumber)
 }

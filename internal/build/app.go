@@ -12,6 +12,7 @@ import (
 	"github.com/EvgeniyAleksandrov/gophermart/internal/config"
 	"github.com/EvgeniyAleksandrov/gophermart/internal/handler"
 	"github.com/EvgeniyAleksandrov/gophermart/internal/interfaces"
+	"github.com/EvgeniyAleksandrov/gophermart/internal/middleware"
 	"github.com/EvgeniyAleksandrov/gophermart/internal/repository/postgres"
 	"github.com/EvgeniyAleksandrov/gophermart/internal/server"
 	"github.com/EvgeniyAleksandrov/gophermart/internal/service"
@@ -54,6 +55,16 @@ func BuildApp(cfg *config.Config, logger interfaces.Logger) (*app.App, error) {
 
 	if err := serverBuilder.AddHandler(http.MethodPost, "/api/user/login", handler.NewLogin(authService, logger)); err != nil {
 		return nil, errors.Join(fmt.Errorf("register login handler: %w", err), storage.Close())
+	}
+
+	orderService := service.NewOrder(storage, service.NewOrderNumberValidator())
+	authorization := middleware.NewAuth(tokens)
+	if err := serverBuilder.AddHandler(http.MethodPost, "/api/user/orders", authorization.Wrap(handler.NewUploadOrder(orderService, logger))); err != nil {
+		return nil, errors.Join(fmt.Errorf("register upload order handler: %w", err), storage.Close())
+	}
+
+	if err := serverBuilder.AddHandler(http.MethodGet, "/api/user/orders", authorization.Wrap(handler.NewListOrders(orderService, logger))); err != nil {
+		return nil, errors.Join(fmt.Errorf("register list orders handler: %w", err), storage.Close())
 	}
 
 	return app.NewApp(httpServer, logger, storage), nil
