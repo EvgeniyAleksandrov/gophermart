@@ -12,6 +12,8 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/EvgeniyAleksandrov/gophermart/internal/model"
 	"github.com/EvgeniyAleksandrov/gophermart/internal/repository/postgres"
+	"github.com/EvgeniyAleksandrov/gophermart/internal/service/retry"
+	"github.com/EvgeniyAleksandrov/gophermart/internal/service/retry/strategy"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/require"
 )
@@ -22,14 +24,17 @@ func TestDBStorageAddOrder(t *testing.T) {
 		Code:           "23503",
 		ConstraintName: "gophermart_orders_user_fk",
 	}
+
 	otherFK := &pgconn.PgError{
 		Code:           "23503",
 		ConstraintName: "another_fk",
 	}
+
 	otherCode := &pgconn.PgError{
 		Code:           "23505",
 		ConstraintName: "gophermart_orders_user_fk",
 	}
+
 	tests := map[string]struct {
 		insertErr   error
 		insertID    any
@@ -90,6 +95,7 @@ func TestDBStorageAddOrder(t *testing.T) {
 			scanErr:  true,
 		},
 	}
+
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			db, mock, err := sqlmock.New()
@@ -114,7 +120,7 @@ func TestDBStorageAddOrder(t *testing.T) {
 				insert.WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(tc.insertID))
 			}
 
-			created, err := postgres.NewDBStorage(db).AddOrder(context.Background(), 7, "18")
+			created, err := postgres.NewDBStorage(db, singleAttempt(t)).AddOrder(context.Background(), 7, "18")
 			require.Equal(t, tc.wantCreated, created)
 			if tc.scanErr {
 				require.Error(t, err)
@@ -169,6 +175,7 @@ func TestDBStorageListOrdersByUser(t *testing.T) {
 			wantErr: sqlErr,
 		},
 	}
+
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			db, mock, err := sqlmock.New()
@@ -181,12 +188,13 @@ func TestDBStorageListOrdersByUser(t *testing.T) {
 				query.WillReturnRows(tc.rows).RowsWillBeClosed()
 			}
 
-			orders, err := postgres.NewDBStorage(db).ListOrdersByUser(context.Background(), 7)
+			orders, err := postgres.NewDBStorage(db, singleAttempt(t)).ListOrdersByUser(context.Background(), 7)
 			if tc.scanErr {
 				require.Error(t, err)
 			} else {
 				require.ErrorIs(t, err, tc.wantErr)
 			}
+
 			if tc.scanErr || tc.wantErr != nil {
 				require.Nil(t, orders)
 			}
@@ -204,4 +212,61 @@ func TestDBStorageListOrdersByUser(t *testing.T) {
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
+}
+
+func TestListPendingRetryDiscardsPartialRows(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+	failure := &pgconn.PgError{Code: "40001"}
+	query := regexp.QuoteMeta(`SELECT id, user_id, number, status, accrual, uploaded_at FROM public.gophermart_orders WHERE status IN ('NEW', 'PROCESSING') ORDER BY id ASC`)
+	columns := []string{"id", "user_id", "number", "status", "accrual", "uploaded_at"}
+	now := time.Now()
+	first := sqlmock.NewRows(columns).AddRow(1, 7, "18", "NEW", nil, now).AddRow(2, 7, "26", "PROCESSING", nil, now).RowError(1, failure)
+	mock.ExpectQuery(query).WillReturnRows(first).RowsWillBeClosed()
+	mock.ExpectQuery(query).WillReturnRows(sqlmock.NewRows(columns).AddRow(2, 7, "26", "PROCESSING", nil, now)).RowsWillBeClosed()
+	orders, err := postgres.NewDBStorage(db, retryPolicy(t, 5)).ListPending(context.Background())
+	require.NoError(t, err)
+	require.Len(t, orders, 1)
+	require.Equal(t, int64(2), orders[0].ID)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestListPendingEmpty(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+	mock.ExpectQuery("WHERE status IN .* ORDER BY id ASC").WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "number", "status", "accrual", "uploaded_at"})).RowsWillBeClosed()
+	orders, err := postgres.NewDBStorage(db, singleAttempt(t)).ListPending(context.Background())
+	require.NoError(t, err)
+	require.Empty(t, orders)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAddOrderRetryPreservesCreation(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+	mock.ExpectQuery("INSERT INTO public.gophermart_orders").WillReturnError(&pgconn.PgError{Code: "40001"})
+	mock.ExpectQuery("INSERT INTO public.gophermart_orders").WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+	created, err := postgres.NewDBStorage(db, retryPolicy(t, 5)).AddOrder(context.Background(), 7, "18")
+	require.NoError(t, err)
+	require.True(t, created)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAddOrderUnknownOutcomeCannotReplayEvenWhenMatched(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+	failure := &pgconn.PgError{Code: "08006", Message: "lost acknowledgement"}
+	mock.ExpectQuery("INSERT INTO public.gophermart_orders").WillReturnError(failure)
+	policy, err := strategy.NewExponential(5, 0, time.Second, strategy.NewSQLState([]string{"08006"}))
+	require.NoError(t, err)
+	created, err := postgres.NewDBStorage(db, retry.NewRetryer(policy)).AddOrder(context.Background(), 7, "18")
+	require.False(t, created)
+	require.ErrorIs(t, err, failure)
+	var permanent *retry.PermanentError
+	require.ErrorAs(t, err, &permanent)
+	require.NoError(t, mock.ExpectationsWereMet())
 }

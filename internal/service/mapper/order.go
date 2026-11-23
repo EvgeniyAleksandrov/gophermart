@@ -2,8 +2,6 @@
 package mapper
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
@@ -32,11 +30,10 @@ func (m *Order) Present(orders []model.Order) ([]dto.Order, error) {
 
 		if order.Accrual != nil {
 			amount := *order.Accrual
-			if amount < 0 {
-				return nil, errors.New("present order: negative accrual")
+			number, err := NewAmount().Number(amount)
+			if err != nil {
+				return nil, fmt.Errorf("present order: %w", err)
 			}
-
-			number := json.Number(fmt.Sprintf("%d.%02d", amount/100, amount%100))
 			response.Accrual = &number
 		}
 

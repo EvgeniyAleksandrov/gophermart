@@ -1,4 +1,4 @@
-package postgres
+package postgres_test
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"testing/fstest"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/EvgeniyAleksandrov/gophermart/internal/repository/postgres"
 	"github.com/EvgeniyAleksandrov/gophermart/migrations"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/stretchr/testify/require"
@@ -76,7 +77,7 @@ func TestMigratorUp(t *testing.T) {
 			version: -1,
 		},
 		"no change": {
-			version: 4,
+			version: 5,
 		},
 		"dirty": {
 			version: 2,
@@ -87,10 +88,11 @@ func TestMigratorUp(t *testing.T) {
 			ddlError: true,
 		},
 		"restore failure": {
-			version:      4,
+			version:      5,
 			restoreError: true,
 		},
 	}
+
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			fixture := &migrationFixture{}
@@ -111,6 +113,12 @@ func TestMigratorUp(t *testing.T) {
 					fixture.setVersion(version+1, false)
 				}
 			}
+
+			if tc.version < 0 && !tc.ddlError {
+				fixture.setVersion(5, true)
+				fixture.mock.ExpectExec("CREATE INDEX gophermart_orders_pending_id_idx").WillReturnResult(sqlmock.NewResult(0, 1))
+				fixture.setVersion(5, false)
+			}
 			fixture.mock.ExpectExec("SELECT pg_advisory_unlock").WithArgs(sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(0, 1))
 			var restoreErr error
 			if tc.restoreError {
@@ -122,7 +130,7 @@ func TestMigratorUp(t *testing.T) {
 				fixture.mock.ExpectClose()
 			}
 
-			err := NewMigrator(fixture.db, migrations.NewSource().FS()).Up(context.Background())
+			err := postgres.NewMigrator(fixture.db, migrations.NewSource().FS()).Up(context.Background())
 			if failed {
 				require.Error(t, err)
 			} else {
@@ -130,6 +138,7 @@ func TestMigratorUp(t *testing.T) {
 				fixture.mock.ExpectPing()
 				require.NoError(t, fixture.db.Ping())
 			}
+
 			if tc.dirty {
 				var dirty migrate.ErrDirty
 				require.ErrorAs(t, err, &dirty)
@@ -149,7 +158,7 @@ func TestMigratorInitializationFailure(t *testing.T) {
 	fixture.restore(nil)
 	fixture.mock.ExpectClose()
 
-	err := NewMigrator(fixture.db, migrations.NewSource().FS()).Up(context.Background())
+	err := postgres.NewMigrator(fixture.db, migrations.NewSource().FS()).Up(context.Background())
 	require.ErrorIs(t, err, failure)
 	require.NoError(t, fixture.mock.ExpectationsWereMet())
 }
@@ -157,10 +166,10 @@ func TestMigratorInitializationFailure(t *testing.T) {
 func TestMigratorSourceAndCancellation(t *testing.T) {
 	fixture := &migrationFixture{}
 	fixture.setup(t)
-	require.Error(t, NewMigrator(fixture.db, fstest.MapFS{}).Up(context.Background()))
+	require.Error(t, postgres.NewMigrator(fixture.db, fstest.MapFS{}).Up(context.Background()))
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	require.ErrorIs(t, NewMigrator(fixture.db, migrations.NewSource().FS()).Up(ctx), context.Canceled)
+	require.ErrorIs(t, postgres.NewMigrator(fixture.db, migrations.NewSource().FS()).Up(ctx), context.Canceled)
 	require.NoError(t, fixture.mock.ExpectationsWereMet())
 }
 
@@ -174,6 +183,7 @@ func TestMigratorTimeoutSetupFailure(t *testing.T) {
 		},
 		"set failure restores saved values": {},
 	}
+
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			fixture := &migrationFixture{}
@@ -188,7 +198,7 @@ func TestMigratorTimeoutSetupFailure(t *testing.T) {
 			}
 			fixture.mock.ExpectClose()
 
-			err := NewMigrator(fixture.db, migrations.NewSource().FS()).Up(context.Background())
+			err := postgres.NewMigrator(fixture.db, migrations.NewSource().FS()).Up(context.Background())
 			require.ErrorIs(t, err, failure)
 			require.Zero(t, fixture.db.Stats().InUse)
 			require.NoError(t, fixture.mock.ExpectationsWereMet())
@@ -212,7 +222,7 @@ func TestMigratorCancellationDuringUp(t *testing.T) {
 	fixture.setup(t)
 	fixture.settings()
 	fixture.initialize()
-	fixture.version(4, false)
+	fixture.version(5, false)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	fixture.mock.ExpectExec("SELECT pg_advisory_unlock").
@@ -220,7 +230,7 @@ func TestMigratorCancellationDuringUp(t *testing.T) {
 	fixture.restore(nil)
 	fixture.mock.ExpectClose()
 
-	err := NewMigrator(fixture.db, migrations.NewSource().FS()).Up(ctx)
+	err := postgres.NewMigrator(fixture.db, migrations.NewSource().FS()).Up(ctx)
 	require.ErrorIs(t, err, context.Canceled)
 	require.Zero(t, fixture.db.Stats().InUse)
 	require.NoError(t, fixture.mock.ExpectationsWereMet())

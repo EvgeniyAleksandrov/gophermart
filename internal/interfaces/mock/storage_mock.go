@@ -71,6 +71,20 @@ func (mr *MockDBStorageMockRecorder) AddUser(ctx, login, passwordHash any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddUser", reflect.TypeOf((*MockDBStorage)(nil).AddUser), ctx, login, passwordHash)
 }
 
+// ApplyAccrual mocks base method.
+func (m *MockDBStorage) ApplyAccrual(arg0 context.Context, arg1, arg2 int64, arg3 model.AccrualResult) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ApplyAccrual", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ApplyAccrual indicates an expected call of ApplyAccrual.
+func (mr *MockDBStorageMockRecorder) ApplyAccrual(arg0, arg1, arg2, arg3 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyAccrual", reflect.TypeOf((*MockDBStorage)(nil).ApplyAccrual), arg0, arg1, arg2, arg3)
+}
+
 // FindUserByLogin mocks base method.
 func (m *MockDBStorage) FindUserByLogin(ctx context.Context, login string) (model.User, error) {
 	m.ctrl.T.Helper()
@@ -86,6 +100,21 @@ func (mr *MockDBStorageMockRecorder) FindUserByLogin(ctx, login any) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindUserByLogin", reflect.TypeOf((*MockDBStorage)(nil).FindUserByLogin), ctx, login)
 }
 
+// GetBalance mocks base method.
+func (m *MockDBStorage) GetBalance(arg0 context.Context, arg1 int64) (model.Balance, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBalance", arg0, arg1)
+	ret0, _ := ret[0].(model.Balance)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBalance indicates an expected call of GetBalance.
+func (mr *MockDBStorageMockRecorder) GetBalance(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBalance", reflect.TypeOf((*MockDBStorage)(nil).GetBalance), arg0, arg1)
+}
+
 // ListOrdersByUser mocks base method.
 func (m *MockDBStorage) ListOrdersByUser(ctx context.Context, userID int64) ([]model.Order, error) {
 	m.ctrl.T.Helper()
@@ -99,6 +128,21 @@ func (m *MockDBStorage) ListOrdersByUser(ctx context.Context, userID int64) ([]m
 func (mr *MockDBStorageMockRecorder) ListOrdersByUser(ctx, userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListOrdersByUser", reflect.TypeOf((*MockDBStorage)(nil).ListOrdersByUser), ctx, userID)
+}
+
+// ListPending mocks base method.
+func (m *MockDBStorage) ListPending(arg0 context.Context) ([]model.Order, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListPending", arg0)
+	ret0, _ := ret[0].([]model.Order)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListPending indicates an expected call of ListPending.
+func (mr *MockDBStorageMockRecorder) ListPending(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPending", reflect.TypeOf((*MockDBStorage)(nil).ListPending), arg0)
 }
 
 // UserExists mocks base method.

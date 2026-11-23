@@ -12,13 +12,40 @@ import (
 
 // AddOrder inserts a NEW order with database defaults, without changing repeats.
 // A separate SELECT sees a committed competing insert after ON CONFLICT waits.
-// Only the order's user foreign key maps to ErrUserNotFound. No retries are made:
-// a failed write may have an unknown outcome and cannot promise created vs repeated.
+// Only the order's user foreign key maps to ErrUserNotFound. Unknown write outcomes
+// are not replayed, preserving the distinction between creation and repetition.
 func (s *DBStorage) AddOrder(ctx context.Context, userID int64, number string) (bool, error) {
+	op := &addOrder{userID: userID, number: number}
+	if err := s.execute(ctx, op); err != nil {
+		return false, err
+	}
+
+	return op.result, nil
+}
+
+type addOrder struct {
+	userID int64
+	number string
+	result bool
+}
+
+func (o *addOrder) CanReplayUnknownOutcome() bool { return false }
+
+func (o *addOrder) Execute(ctx context.Context, db *sql.DB) error {
+	o.result = false
+	result, err := o.run(ctx, db)
+	if err == nil {
+		o.result = result
+	}
+
+	return err
+}
+
+func (o *addOrder) run(ctx context.Context, db *sql.DB) (bool, error) {
 	var id int64
-	err := s.db.QueryRowContext(ctx, `
+	err := db.QueryRowContext(ctx, `
  INSERT INTO public.gophermart_orders (user_id, number)
- VALUES ($1, $2) ON CONFLICT (number) DO NOTHING RETURNING id`, userID, number).Scan(&id)
+ VALUES ($1, $2) ON CONFLICT (number) DO NOTHING RETURNING id`, o.userID, o.number).Scan(&id)
 	if err == nil {
 		return true, nil
 	}
@@ -29,17 +56,17 @@ func (s *DBStorage) AddOrder(ctx context.Context, userID int64, number string) (
 			return false, fmt.Errorf("add order: %w", model.ErrUserNotFound)
 		}
 
-		return false, fmt.Errorf("add order: %w", err)
+		return false, fmt.Errorf("add order: %w", (&writeOutcome{}).classify(err))
 	}
 
 	var ownerID int64
-	err = s.db.QueryRowContext(ctx, `
- SELECT user_id FROM public.gophermart_orders WHERE number = $1`, number).Scan(&ownerID)
+	err = db.QueryRowContext(ctx, `
+ SELECT user_id FROM public.gophermart_orders WHERE number = $1`, o.number).Scan(&ownerID)
 	if err != nil {
 		return false, fmt.Errorf("find existing order owner: %w", err)
 	}
 
-	if ownerID != userID {
+	if ownerID != o.userID {
 		return false, model.ErrOrderOwnedByAnotherUser
 	}
 
@@ -49,10 +76,42 @@ func (s *DBStorage) AddOrder(ctx context.Context, userID int64, number string) (
 // ListOrdersByUser reads only this user's orders, newest first with ID as tie-breaker.
 // It returns no partial results on query, scan or iteration failures.
 func (s *DBStorage) ListOrdersByUser(ctx context.Context, userID int64) ([]model.Order, error) {
-	rows, err := s.db.QueryContext(ctx, `
- SELECT id, user_id, number, status, accrual, uploaded_at
- FROM public.gophermart_orders WHERE user_id = $1
- ORDER BY uploaded_at DESC, id DESC`, userID)
+	op := &listOrders{userID: userID}
+	if err := s.execute(ctx, op); err != nil {
+		return nil, err
+	}
+
+	return op.result, nil
+}
+
+type listOrders struct {
+	pending bool
+	userID  int64
+	result  []model.Order
+}
+
+func (o *listOrders) CanReplayUnknownOutcome() bool { return true }
+
+func (o *listOrders) Execute(ctx context.Context, db *sql.DB) error {
+	o.result = nil
+	result, err := o.run(ctx, db)
+	if err == nil {
+		o.result = result
+	}
+
+	return err
+}
+
+func (o *listOrders) run(ctx context.Context, db *sql.DB) ([]model.Order, error) {
+	query := `SELECT id, user_id, number, status, accrual, uploaded_at
+ FROM public.gophermart_orders WHERE user_id = $1 ORDER BY uploaded_at DESC, id DESC`
+	args := []any{o.userID}
+	if o.pending {
+		query = `SELECT id, user_id, number, status, accrual, uploaded_at
+ FROM public.gophermart_orders WHERE status IN ('NEW', 'PROCESSING') ORDER BY id ASC`
+		args = nil
+	}
+	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list orders: %w", err)
 	}
@@ -84,5 +143,19 @@ func (s *DBStorage) ListOrdersByUser(ctx context.Context, userID int64) ([]model
 		return nil, fmt.Errorf("read orders: %w", err)
 	}
 
+	if err := rows.Close(); err != nil {
+		return nil, fmt.Errorf("close orders: %w", err)
+	}
+
 	return orders, nil
+}
+
+// ListPending fully reads all unfinished orders in ID order before returning.
+func (s *DBStorage) ListPending(ctx context.Context) ([]model.Order, error) {
+	op := &listOrders{pending: true}
+	if err := s.execute(ctx, op); err != nil {
+		return nil, err
+	}
+
+	return op.result, nil
 }

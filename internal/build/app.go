@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/EvgeniyAleksandrov/gophermart/internal/app"
 	"github.com/EvgeniyAleksandrov/gophermart/internal/auth"
+	"github.com/EvgeniyAleksandrov/gophermart/internal/client/accrual"
 	"github.com/EvgeniyAleksandrov/gophermart/internal/config"
 	"github.com/EvgeniyAleksandrov/gophermart/internal/handler"
 	"github.com/EvgeniyAleksandrov/gophermart/internal/interfaces"
@@ -16,7 +18,17 @@ import (
 	"github.com/EvgeniyAleksandrov/gophermart/internal/repository/postgres"
 	"github.com/EvgeniyAleksandrov/gophermart/internal/server"
 	"github.com/EvgeniyAleksandrov/gophermart/internal/service"
+	"github.com/EvgeniyAleksandrov/gophermart/internal/service/retry"
+	"github.com/EvgeniyAleksandrov/gophermart/internal/service/retry/strategy"
+	"github.com/EvgeniyAleksandrov/gophermart/internal/worker"
 	"github.com/EvgeniyAleksandrov/gophermart/migrations"
+)
+
+const (
+	dbMaxAttempts         = 5
+	dbRetryInitialDelay   = time.Second
+	dbRetryMaxDelay       = 10 * time.Second
+	accrualRequestTimeout = 10 * time.Second
 )
 
 // BuildApp assembles an application using validated configuration and a logger.
@@ -42,7 +54,12 @@ func BuildApp(cfg *config.Config, logger interfaces.Logger) (*app.App, error) {
 		return nil, fmt.Errorf("build server: %w", err)
 	}
 
-	storageBuilder := postgres.NewDBStorageBuilder(cfg.DatabaseURI, migrations.NewSource().FS())
+	dbStrategy, err := strategy.NewExponential(dbMaxAttempts, dbRetryInitialDelay, dbRetryMaxDelay, strategy.NewSQLState([]string{"40001", "40P01"}))
+	if err != nil {
+		return nil, err
+	}
+
+	storageBuilder := postgres.NewDBStorageBuilder(cfg.DatabaseURI, migrations.NewSource().FS(), retry.NewRetryer(dbStrategy))
 	storage, err := storageBuilder.Build(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("build storage: %w", err)
@@ -67,5 +84,13 @@ func BuildApp(cfg *config.Config, logger interfaces.Logger) (*app.App, error) {
 		return nil, errors.Join(fmt.Errorf("register list orders handler: %w", err), storage.Close())
 	}
 
-	return app.NewApp(httpServer, logger, storage), nil
+	balanceService := service.NewBalance(storage)
+	if err := serverBuilder.AddHandler(http.MethodGet, "/api/user/balance", authorization.Wrap(handler.NewBalance(balanceService, logger))); err != nil {
+		return nil, errors.Join(fmt.Errorf("register balance handler: %w", err), storage.Close())
+	}
+
+	client := accrual.NewClient(cfg.AccrualSystemAddress, &http.Client{Timeout: accrualRequestTimeout}, retry.NewRetryer(strategy.NewRateLimit()))
+	processor := service.NewAccrual(storage, client)
+	background := worker.NewAccrual(processor, logger)
+	return app.NewApp(httpServer, logger, storage, background), nil
 }

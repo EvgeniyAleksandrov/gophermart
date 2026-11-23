@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"time"
 
+	"github.com/EvgeniyAleksandrov/gophermart/internal/interfaces"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/stdlib"
 )
@@ -21,13 +22,14 @@ const (
 
 // DBStorageBuilder prepares a SQL pool and applies migrations before returning storage.
 type DBStorageBuilder struct {
-	dsn   string
-	files fs.FS
+	dsn     string
+	files   fs.FS
+	retryer interfaces.Retryer
 }
 
 // NewDBStorageBuilder receives all configuration needed to build storage.
-func NewDBStorageBuilder(dsn string, files fs.FS) *DBStorageBuilder {
-	return &DBStorageBuilder{dsn: dsn, files: files}
+func NewDBStorageBuilder(dsn string, files fs.FS, retryer interfaces.Retryer) *DBStorageBuilder {
+	return &DBStorageBuilder{dsn: dsn, files: files, retryer: retryer}
 }
 
 // Build opens and checks the pool, then applies migrations without application retries.
@@ -50,7 +52,7 @@ func (b *DBStorageBuilder) prepare(ctx context.Context, db *sql.DB) (*DBStorage,
 		return nil, errors.Join(err, db.Close())
 	}
 
-	return NewDBStorage(db), nil
+	return NewDBStorage(db, b.retryer), nil
 }
 
 func (b *DBStorageBuilder) initialize(ctx context.Context, db *sql.DB) error {

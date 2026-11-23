@@ -10,6 +10,13 @@ import (
 
 // DBStorage exposes database operations to consumers, excluding lifecycle ownership.
 type DBStorage interface {
+	// ListPending returns all unfinished orders in ID order.
+	ListPending(context.Context) ([]model.Order, error)
+	// ApplyAccrual updates order and balance atomically and idempotently.
+	ApplyAccrual(context.Context, int64, int64, model.AccrualResult) error
+	// GetBalance reads the user's balance in hundredths.
+	GetBalance(context.Context, int64) (model.Balance, error)
+
 	// UserExists checks whether the user is present at the time of the query.
 	UserExists(ctx context.Context, userID int64) (bool, error)
 	// AddOrder returns true for a new order, false for a repeat by its owner.

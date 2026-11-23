@@ -11,10 +11,36 @@ import (
 )
 
 // AddUser atomically creates a user and its zero balance at Read Committed isolation.
-// Only the login constraint maps to ErrLoginTaken. Commit errors are not retried:
-// a failed commit may have an unknown outcome. Cleanup errors remain discoverable.
-func (s *DBStorage) AddUser(ctx context.Context, login, passwordHash string) (_ model.User, err error) {
-	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
+// Only the login constraint maps to ErrLoginTaken. Unknown commit outcomes are not
+// replayed. Each retry starts a new transaction; cleanup errors remain discoverable.
+func (s *DBStorage) AddUser(ctx context.Context, login, passwordHash string) (model.User, error) {
+	op := &addUser{login: login, passwordHash: passwordHash}
+	if err := s.execute(ctx, op); err != nil {
+		return model.User{}, err
+	}
+
+	return op.result, nil
+}
+
+type addUser struct {
+	login, passwordHash string
+	result              model.User
+}
+
+func (o *addUser) CanReplayUnknownOutcome() bool { return false }
+
+func (o *addUser) Execute(ctx context.Context, db *sql.DB) error {
+	o.result = model.User{}
+	result, err := o.run(ctx, db)
+	if err == nil {
+		o.result = result
+	}
+
+	return err
+}
+
+func (o *addUser) run(ctx context.Context, db *sql.DB) (_ model.User, err error) {
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelReadCommitted})
 	if err != nil {
 		return model.User{}, fmt.Errorf("begin user transaction: %w", err)
 	}
@@ -28,7 +54,7 @@ func (s *DBStorage) AddUser(ctx context.Context, login, passwordHash string) (_ 
 	var user model.User
 	err = tx.QueryRowContext(ctx, `
   INSERT INTO public.gophermart_users (login, password_hash)
-  VALUES ($1, $2) RETURNING id, login, password_hash`, login, passwordHash).
+  VALUES ($1, $2) RETURNING id, login, password_hash`, o.login, o.passwordHash).
 		Scan(&user.ID, &user.Login, &user.PasswordHash)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -46,7 +72,7 @@ func (s *DBStorage) AddUser(ctx context.Context, login, passwordHash string) (_ 
 	}
 
 	if err := tx.Commit(); err != nil {
-		return model.User{}, fmt.Errorf("commit user transaction: %w", err)
+		return model.User{}, fmt.Errorf("commit user transaction: %w", (&writeOutcome{}).classify(err))
 	}
 
 	return user, nil
@@ -55,9 +81,35 @@ func (s *DBStorage) AddUser(ctx context.Context, login, passwordHash string) (_ 
 // FindUserByLogin reads credentials without normalizing the login or comparing passwords.
 // A missing row maps to ErrUserNotFound; SQL errors remain internal failures.
 func (s *DBStorage) FindUserByLogin(ctx context.Context, login string) (model.User, error) {
+	op := &findUser{login: login}
+	if err := s.execute(ctx, op); err != nil {
+		return model.User{}, err
+	}
+
+	return op.result, nil
+}
+
+type findUser struct {
+	login  string
+	result model.User
+}
+
+func (o *findUser) CanReplayUnknownOutcome() bool { return true }
+
+func (o *findUser) Execute(ctx context.Context, db *sql.DB) error {
+	o.result = model.User{}
+	result, err := o.run(ctx, db)
+	if err == nil {
+		o.result = result
+	}
+
+	return err
+}
+
+func (o *findUser) run(ctx context.Context, db *sql.DB) (model.User, error) {
 	var user model.User
-	err := s.db.QueryRowContext(ctx, `
-  SELECT id, login, password_hash FROM public.gophermart_users WHERE login = $1`, login).
+	err := db.QueryRowContext(ctx, `
+  SELECT id, login, password_hash FROM public.gophermart_users WHERE login = $1`, o.login).
 		Scan(&user.ID, &user.Login, &user.PasswordHash)
 	if errors.Is(err, sql.ErrNoRows) {
 		return model.User{}, model.ErrUserNotFound
@@ -72,9 +124,35 @@ func (s *DBStorage) FindUserByLogin(ctx context.Context, login string) (model.Us
 
 // UserExists checks only the user's primary key, without reading credentials.
 func (s *DBStorage) UserExists(ctx context.Context, userID int64) (bool, error) {
+	op := &userExists{userID: userID}
+	if err := s.execute(ctx, op); err != nil {
+		return false, err
+	}
+
+	return op.result, nil
+}
+
+type userExists struct {
+	userID int64
+	result bool
+}
+
+func (o *userExists) CanReplayUnknownOutcome() bool { return true }
+
+func (o *userExists) Execute(ctx context.Context, db *sql.DB) error {
+	o.result = false
+	result, err := o.run(ctx, db)
+	if err == nil {
+		o.result = result
+	}
+
+	return err
+}
+
+func (o *userExists) run(ctx context.Context, db *sql.DB) (bool, error) {
 	var exists bool
-	err := s.db.QueryRowContext(ctx, `
- SELECT EXISTS (SELECT 1 FROM public.gophermart_users WHERE id = $1)`, userID).Scan(&exists)
+	err := db.QueryRowContext(ctx, `
+ SELECT EXISTS (SELECT 1 FROM public.gophermart_users WHERE id = $1)`, o.userID).Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("check user existence: %w", err)
 	}
