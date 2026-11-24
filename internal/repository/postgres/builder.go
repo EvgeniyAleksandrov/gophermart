@@ -20,20 +20,16 @@ const (
 	connectionPingTimeout = 5 * time.Second
 )
 
-// DBStorageBuilder prepares a SQL pool and applies migrations before returning storage.
 type DBStorageBuilder struct {
 	dsn     string
 	files   fs.FS
 	retryer interfaces.Retryer
 }
 
-// NewDBStorageBuilder receives all configuration needed to build storage.
 func NewDBStorageBuilder(dsn string, files fs.FS, retryer interfaces.Retryer) *DBStorageBuilder {
 	return &DBStorageBuilder{dsn: dsn, files: files, retryer: retryer}
 }
 
-// Build opens and checks the pool, then applies migrations without application retries.
-// On failure it closes the pool; on success ownership passes to DBStorage.
 func (b *DBStorageBuilder) Build(ctx context.Context) (*DBStorage, error) {
 	cfg, err := pgx.ParseConfig(b.dsn)
 	if err != nil {

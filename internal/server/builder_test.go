@@ -70,8 +70,14 @@ func TestAddHandlerValidation(t *testing.T) {
 func TestRoutesAndDuplicate(t *testing.T) {
 	builder := NewServerBuilder(":8090")
 	require.NoError(t, builder.AddHandler(http.MethodGet, "/orders", &statusHandler{code: http.StatusOK}))
-	require.NoError(t, builder.AddHandler(http.MethodPost, "/orders", &statusHandler{code: http.StatusAccepted}))
-	require.NoError(t, builder.AddHandler(http.MethodGet, "/orders", &statusHandler{code: http.StatusNoContent}))
+	require.NoError(
+		t,
+		builder.AddHandler(http.MethodPost, "/orders", &statusHandler{code: http.StatusAccepted}),
+	)
+	require.NoError(
+		t,
+		builder.AddHandler(http.MethodGet, "/orders", &statusHandler{code: http.StatusNoContent}),
+	)
 
 	httpServer, err := builder.Build()
 	require.NoError(t, err)

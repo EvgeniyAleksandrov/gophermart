@@ -63,13 +63,15 @@ func TestBalanceHandler(t *testing.T) {
 			service := NewMockBalanceService(gomock.NewController(t))
 			var operationCtx context.Context
 			if tc.userID != 0 {
-				service.EXPECT().Get(gomock.Any(), tc.userID).DoAndReturn(func(ctx context.Context, id int64) (model.Balance, error) {
-					operationCtx = ctx
-					deadline, ok := ctx.Deadline()
-					require.True(t, ok)
-					require.InDelta(t, 25, time.Until(deadline).Seconds(), 0.1)
-					return tc.balance, tc.err
-				})
+				service.EXPECT().Get(gomock.Any(), tc.userID).
+					DoAndReturn(func(ctx context.Context, id int64) (model.Balance, error) {
+						operationCtx = ctx
+						deadline, ok := ctx.Deadline()
+						require.True(t, ok)
+						require.InDelta(t, 25, time.Until(deadline).Seconds(), 0.1)
+
+						return tc.balance, tc.err
+					})
 			}
 
 			request := httptest.NewRequest(http.MethodGet, "/api/user/balance?user_id=99", nil)

@@ -150,6 +150,7 @@ func TestTokenManagerVerify(t *testing.T) {
 			if method == nil {
 				method = jwt.SigningMethodHS256
 			}
+
 			signingKey := tc.key
 			if signingKey == nil {
 				signingKey = key

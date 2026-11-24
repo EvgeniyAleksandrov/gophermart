@@ -18,6 +18,7 @@ import (
 
 func TestApplyAccrual(t *testing.T) {
 	failure := errors.New("SQL failed")
+
 	for name, tc := range map[string]struct {
 		status         model.AccrualStatus
 		final          bool
@@ -125,6 +126,7 @@ func TestApplyAccrual(t *testing.T) {
 			db, mock, err := sqlmock.New()
 			require.NoError(t, err)
 			defer db.Close()
+
 			mock.ExpectBegin().WillReturnError(tc.beginErr)
 			stopped := tc.beginErr != nil
 			if !stopped {
@@ -132,10 +134,13 @@ func TestApplyAccrual(t *testing.T) {
 				if !tc.missingBalance {
 					rows.AddRow(tc.current)
 				}
-				mock.ExpectQuery("SELECT current .*FOR UPDATE").WithArgs(int64(7)).WillReturnRows(rows).WillReturnError(tc.lockErr)
+
+				mock.ExpectQuery("SELECT current .*FOR UPDATE").WithArgs(int64(7)).WillReturnRows(rows).
+					WillReturnError(tc.lockErr)
 				stopped = tc.lockErr != nil || tc.missingBalance
 				if tc.missingBalance {
-					mock.ExpectQuery("SELECT EXISTS").WithArgs(int64(7)).WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(tc.userExists))
+					mock.ExpectQuery("SELECT EXISTS").WithArgs(int64(7)).
+						WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(tc.userExists))
 				}
 			}
 
@@ -154,7 +159,10 @@ func TestApplyAccrual(t *testing.T) {
 				if !tc.missingOrder {
 					rows.AddRow(owner, "18", status)
 				}
-				mock.ExpectQuery("SELECT user_id, number, status .*FOR UPDATE").WithArgs(int64(1)).WillReturnRows(rows).WillReturnError(tc.orderErr)
+
+				mock.ExpectQuery("SELECT user_id, number, status .*FOR UPDATE").WithArgs(int64(1)).
+					WillReturnRows(rows).
+					WillReturnError(tc.orderErr)
 				stopped = tc.missingOrder || tc.orderErr != nil || tc.final || tc.mismatch
 			}
 
@@ -169,7 +177,10 @@ func TestApplyAccrual(t *testing.T) {
 					next, amount = "PROCESSED", tc.amount
 					stopped = tc.amount < 0 || tc.amount > math.MaxInt64-tc.current
 					if !stopped {
-						mock.ExpectExec("UPDATE public.gophermart_balances").WithArgs(tc.current+tc.amount, int64(7)).WillReturnResult(sqlmock.NewResult(0, 1)).WillReturnError(tc.balanceErr)
+						mock.ExpectExec("UPDATE public.gophermart_balances").
+							WithArgs(tc.current+tc.amount, int64(7)).
+							WillReturnResult(sqlmock.NewResult(0, 1)).
+							WillReturnError(tc.balanceErr)
 						stopped = tc.balanceErr != nil
 					}
 				default:
@@ -178,7 +189,9 @@ func TestApplyAccrual(t *testing.T) {
 			}
 
 			if !stopped {
-				mock.ExpectExec("UPDATE public.gophermart_orders").WithArgs(next, amount, int64(1)).WillReturnResult(sqlmock.NewResult(0, 1)).WillReturnError(tc.updateErr)
+				mock.ExpectExec("UPDATE public.gophermart_orders").WithArgs(next, amount, int64(1)).
+					WillReturnResult(sqlmock.NewResult(0, 1)).
+					WillReturnError(tc.updateErr)
 				stopped = tc.updateErr != nil
 			}
 
@@ -188,7 +201,13 @@ func TestApplyAccrual(t *testing.T) {
 				mock.ExpectRollback().WillReturnError(tc.rollbackErr)
 			}
 
-			err = postgres.NewDBStorage(db, singleAttempt(t)).ApplyAccrual(context.Background(), 1, 7, model.AccrualResult{Number: "18", Status: tc.status, Accrual: tc.amount})
+			err = postgres.NewDBStorage(db, singleAttempt(t)).
+				ApplyAccrual(
+					context.Background(),
+					1,
+					7,
+					model.AccrualResult{Number: "18", Status: tc.status, Accrual: tc.amount},
+				)
 			if tc.wantErr {
 				require.Error(t, err)
 			} else {
@@ -203,6 +222,7 @@ func TestApplyAccrual(t *testing.T) {
 				var unknown *postgres.OutcomeUnknownError
 				require.ErrorAs(t, err, &unknown)
 			}
+
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
@@ -212,15 +232,24 @@ func TestApplyAccrualRetryFreshTransaction(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
 	defer db.Close()
+
 	mock.ExpectBegin()
 	mock.ExpectQuery("SELECT current .*FOR UPDATE").WillReturnError(&pgconn.PgError{Code: "40P01"})
 	mock.ExpectRollback()
 	// A complete new transaction is required after rollback, never a nested query retry.
 	mock.ExpectBegin()
-	mock.ExpectQuery("SELECT current .*FOR UPDATE").WillReturnRows(sqlmock.NewRows([]string{"current"}).AddRow(123))
-	mock.ExpectQuery("SELECT user_id, number, status .*FOR UPDATE").WillReturnRows(sqlmock.NewRows([]string{"user_id", "number", "status"}).AddRow(7, "18", "PROCESSED"))
+	mock.ExpectQuery("SELECT current .*FOR UPDATE").
+		WillReturnRows(sqlmock.NewRows([]string{"current"}).AddRow(123))
+	mock.ExpectQuery("SELECT user_id, number, status .*FOR UPDATE").
+		WillReturnRows(sqlmock.NewRows([]string{"user_id", "number", "status"}).AddRow(7, "18", "PROCESSED"))
 	mock.ExpectRollback()
-	err = postgres.NewDBStorage(db, retryPolicy(t, 5)).ApplyAccrual(context.Background(), 1, 7, model.AccrualResult{Number: "18", Status: model.AccrualProcessed, Accrual: 123})
+	err = postgres.NewDBStorage(db, retryPolicy(t, 5)).
+		ApplyAccrual(
+			context.Background(),
+			1,
+			7,
+			model.AccrualResult{Number: "18", Status: model.AccrualProcessed, Accrual: 123},
+		)
 	require.NoError(t, err)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
@@ -229,21 +258,34 @@ func TestApplyAccrualUnknownCommitWithExplicitPolicy(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
 	defer db.Close()
+
 	failure := &pgconn.PgError{Code: "08006", Message: "connection lost during commit"}
 	policy, err := strategy.NewExponential(5, 0, time.Second, strategy.NewSQLState([]string{"08006"}))
 	require.NoError(t, err)
 	mock.ExpectBegin()
-	mock.ExpectQuery("SELECT current .*FOR UPDATE").WillReturnRows(sqlmock.NewRows([]string{"current"}).AddRow(0))
-	mock.ExpectQuery("SELECT user_id, number, status .*FOR UPDATE").WillReturnRows(sqlmock.NewRows([]string{"user_id", "number", "status"}).AddRow(7, "18", "NEW"))
-	mock.ExpectExec("UPDATE public.gophermart_balances").WithArgs(int64(123), int64(7)).WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec("UPDATE public.gophermart_orders").WithArgs("PROCESSED", int64(123), int64(1)).WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery("SELECT current .*FOR UPDATE").
+		WillReturnRows(sqlmock.NewRows([]string{"current"}).AddRow(0))
+	mock.ExpectQuery("SELECT user_id, number, status .*FOR UPDATE").
+		WillReturnRows(sqlmock.NewRows([]string{"user_id", "number", "status"}).AddRow(7, "18", "NEW"))
+	mock.ExpectExec("UPDATE public.gophermart_balances").WithArgs(int64(123), int64(7)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("UPDATE public.gophermart_orders").WithArgs("PROCESSED", int64(123), int64(1)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit().WillReturnError(failure)
 	// Simulate a commit that actually succeeded despite the lost acknowledgement.
 	mock.ExpectBegin()
-	mock.ExpectQuery("SELECT current .*FOR UPDATE").WillReturnRows(sqlmock.NewRows([]string{"current"}).AddRow(123))
-	mock.ExpectQuery("SELECT user_id, number, status .*FOR UPDATE").WillReturnRows(sqlmock.NewRows([]string{"user_id", "number", "status"}).AddRow(7, "18", "PROCESSED"))
+	mock.ExpectQuery("SELECT current .*FOR UPDATE").
+		WillReturnRows(sqlmock.NewRows([]string{"current"}).AddRow(123))
+	mock.ExpectQuery("SELECT user_id, number, status .*FOR UPDATE").
+		WillReturnRows(sqlmock.NewRows([]string{"user_id", "number", "status"}).AddRow(7, "18", "PROCESSED"))
 	mock.ExpectRollback()
-	err = postgres.NewDBStorage(db, retry.NewRetryer(policy)).ApplyAccrual(context.Background(), 1, 7, model.AccrualResult{Number: "18", Status: model.AccrualProcessed, Accrual: 123})
+	err = postgres.NewDBStorage(db, retry.NewRetryer(policy)).
+		ApplyAccrual(
+			context.Background(),
+			1,
+			7,
+			model.AccrualResult{Number: "18", Status: model.AccrualProcessed, Accrual: 123},
+		)
 	require.NoError(t, err)
 	require.NoError(t, mock.ExpectationsWereMet())
 }

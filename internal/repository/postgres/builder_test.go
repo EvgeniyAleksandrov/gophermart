@@ -10,14 +10,22 @@ import (
 )
 
 func TestDBStorageBuilderFailure(t *testing.T) {
-	builder := postgres.NewDBStorageBuilder("postgres://user:secret@localhost:invalid/db", nil, singleAttempt(t))
+	builder := postgres.NewDBStorageBuilder(
+		"postgres://user:secret@localhost:invalid/db",
+		nil,
+		singleAttempt(t),
+	)
 	storage, err := builder.Build(context.Background())
 	require.Error(t, err)
 	require.Nil(t, storage)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	builder = postgres.NewDBStorageBuilder("host=localhost user=test dbname=test sslmode=disable", nil, singleAttempt(t))
+	builder = postgres.NewDBStorageBuilder(
+		"host=localhost user=test dbname=test sslmode=disable",
+		nil,
+		singleAttempt(t),
+	)
 	storage, err = builder.Build(ctx)
 	require.ErrorIs(t, err, context.Canceled)
 	require.Nil(t, storage)

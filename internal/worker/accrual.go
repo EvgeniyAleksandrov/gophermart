@@ -1,3 +1,5 @@
+//go:generate go run go.uber.org/mock/mockgen@v0.6.0 -source=accrual.go -destination=accrual_mock_test.go -package=worker_test
+
 // Package worker processes unfinished orders sequentially until shutdown.
 package worker
 
@@ -10,11 +12,8 @@ import (
 	"github.com/EvgeniyAleksandrov/gophermart/internal/model"
 )
 
-//go:generate go run go.uber.org/mock/mockgen@v0.6.0 -source=accrual.go -destination=accrual_mock_test.go -package=worker_test
-
 const pollInterval = time.Second
 
-// Processor selects unfinished orders and processes one external calculation.
 type Processor interface {
 	Pending(context.Context) ([]model.Order, error)
 	Process(context.Context, model.Order) error
@@ -26,12 +25,10 @@ type Accrual struct {
 	logger    interfaces.Logger
 }
 
-// NewAccrual receives the prepared processor and shared logger.
 func NewAccrual(processor Processor, logger interfaces.Logger) *Accrual {
 	return &Accrual{processor: processor, logger: logger}
 }
 
-// Run starts immediately and polls indefinitely. Cancellation is normal completion.
 func (w *Accrual) Run(ctx context.Context) error {
 	for ctx.Err() == nil {
 		if err := w.pass(ctx); err != nil && ctx.Err() == nil {

@@ -32,6 +32,7 @@ func TestGetBalance(t *testing.T) {
 			db, mock, err := sqlmock.New()
 			require.NoError(t, err)
 			defer db.Close()
+
 			rows := sqlmock.NewRows([]string{"current", "withdrawn"})
 			if !tc.missing {
 				rows.AddRow(123, 456)
@@ -40,8 +41,12 @@ func TestGetBalance(t *testing.T) {
 			if tc.scan {
 				rows = sqlmock.NewRows([]string{"current", "withdrawn"}).AddRow(123, "invalid")
 			}
-			mock.ExpectQuery("SELECT current, withdrawn FROM public.gophermart_balances").WithArgs(int64(7)).WillReturnRows(rows).WillReturnError(tc.err)
+
+			mock.ExpectQuery("SELECT current, withdrawn FROM public.gophermart_balances").WithArgs(int64(7)).
+				WillReturnRows(rows).
+				WillReturnError(tc.err)
 			got, err := postgres.NewDBStorage(db, singleAttempt(t)).GetBalance(context.Background(), 7)
+
 			switch {
 			case tc.missing:
 				require.ErrorIs(t, err, model.ErrBalanceNotFound)
@@ -52,6 +57,7 @@ func TestGetBalance(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, model.Balance{Current: 123, Withdrawn: 456}, got)
 			}
+
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}

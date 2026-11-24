@@ -4,5 +4,6 @@ import "time"
 
 const (
 	maxCredentialsBodyBytes = 64 * 1024
+	maxWithdrawalBodyBytes  = 64 * 1024
 	httpOperationTimeout    = 25 * time.Second
 )

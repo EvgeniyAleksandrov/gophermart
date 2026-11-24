@@ -17,110 +17,151 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockAuthService is a mock of AuthService interface.
 type MockAuthService struct {
 	ctrl     *gomock.Controller
 	recorder *MockAuthServiceMockRecorder
 	isgomock struct{}
 }
 
-// MockAuthServiceMockRecorder is the mock recorder for MockAuthService.
 type MockAuthServiceMockRecorder struct {
 	mock *MockAuthService
 }
 
-// NewMockAuthService creates a new mock instance.
 func NewMockAuthService(ctrl *gomock.Controller) *MockAuthService {
 	mock := &MockAuthService{ctrl: ctrl}
 	mock.recorder = &MockAuthServiceMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockAuthService) EXPECT() *MockAuthServiceMockRecorder {
 	return m.recorder
 }
 
-// Login mocks base method.
 func (m *MockAuthService) Login(ctx context.Context, login, password string) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Login", ctx, login, password)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
+
 	return ret0, ret1
 }
 
-// Login indicates an expected call of Login.
 func (mr *MockAuthServiceMockRecorder) Login(ctx, login, password any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Login", reflect.TypeOf((*MockAuthService)(nil).Login), ctx, login, password)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Login", reflect.TypeOf((*MockAuthService)(nil).
+		Login), ctx, login, password)
 }
 
-// Register mocks base method.
 func (m *MockAuthService) Register(ctx context.Context, login, password string) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Register", ctx, login, password)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
+
 	return ret0, ret1
 }
 
-// Register indicates an expected call of Register.
 func (mr *MockAuthServiceMockRecorder) Register(ctx, login, password any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockAuthService)(nil).Register), ctx, login, password)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockAuthService)(nil).
+		Register), ctx, login, password)
 }
 
-// MockOrderService is a mock of OrderService interface.
 type MockOrderService struct {
 	ctrl     *gomock.Controller
 	recorder *MockOrderServiceMockRecorder
 	isgomock struct{}
 }
 
-// MockOrderServiceMockRecorder is the mock recorder for MockOrderService.
 type MockOrderServiceMockRecorder struct {
 	mock *MockOrderService
 }
 
-// NewMockOrderService creates a new mock instance.
 func NewMockOrderService(ctrl *gomock.Controller) *MockOrderService {
 	mock := &MockOrderService{ctrl: ctrl}
 	mock.recorder = &MockOrderServiceMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockOrderService) EXPECT() *MockOrderServiceMockRecorder {
 	return m.recorder
 }
 
-// List mocks base method.
 func (m *MockOrderService) List(ctx context.Context, userID int64) ([]model.Order, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "List", ctx, userID)
 	ret0, _ := ret[0].([]model.Order)
 	ret1, _ := ret[1].(error)
+
 	return ret0, ret1
 }
 
-// List indicates an expected call of List.
 func (mr *MockOrderServiceMockRecorder) List(ctx, userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockOrderService)(nil).List), ctx, userID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockOrderService)(nil).
+		List), ctx, userID)
 }
 
-// Upload mocks base method.
 func (m *MockOrderService) Upload(ctx context.Context, userID int64, rawNumber string) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Upload", ctx, userID, rawNumber)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
+
 	return ret0, ret1
 }
 
-// Upload indicates an expected call of Upload.
 func (mr *MockOrderServiceMockRecorder) Upload(ctx, userID, rawNumber any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upload", reflect.TypeOf((*MockOrderService)(nil).Upload), ctx, userID, rawNumber)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upload", reflect.TypeOf((*MockOrderService)(nil).
+		Upload), ctx, userID, rawNumber)
+}
+
+type MockWithdrawalService struct {
+	ctrl     *gomock.Controller
+	recorder *MockWithdrawalServiceMockRecorder
+	isgomock struct{}
+}
+
+type MockWithdrawalServiceMockRecorder struct {
+	mock *MockWithdrawalService
+}
+
+func NewMockWithdrawalService(ctrl *gomock.Controller) *MockWithdrawalService {
+	mock := &MockWithdrawalService{ctrl: ctrl}
+	mock.recorder = &MockWithdrawalServiceMockRecorder{mock}
+	return mock
+}
+
+func (m *MockWithdrawalService) EXPECT() *MockWithdrawalServiceMockRecorder {
+	return m.recorder
+}
+
+func (m *MockWithdrawalService) List(ctx context.Context, userID int64) ([]model.Withdrawal, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "List", ctx, userID)
+	ret0, _ := ret[0].([]model.Withdrawal)
+	ret1, _ := ret[1].(error)
+
+	return ret0, ret1
+}
+
+func (mr *MockWithdrawalServiceMockRecorder) List(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockWithdrawalService)(nil).
+		List), ctx, userID)
+}
+
+func (m *MockWithdrawalService) Withdraw(ctx context.Context, userID int64, number string, sum int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Withdraw", ctx, userID, number, sum)
+	ret0, _ := ret[0].(error)
+
+	return ret0
+}
+
+func (mr *MockWithdrawalServiceMockRecorder) Withdraw(ctx, userID, number, sum any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Withdraw", reflect.TypeOf((*MockWithdrawalService)(nil).
+		Withdraw), ctx, userID, number, sum)
 }

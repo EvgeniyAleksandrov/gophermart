@@ -96,6 +96,7 @@ func TestOrderUpload(t *testing.T) {
 			wantErr: storageErr,
 		},
 	}
+
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
@@ -108,12 +109,15 @@ func TestOrderUpload(t *testing.T) {
 			if tc.userID > 0 {
 				calls = append(calls, validator.EXPECT().Validate(tc.number).Return(tc.validationErr))
 				if tc.validationErr == nil {
-					calls = append(calls, storage.EXPECT().UserExists(ctx, tc.userID).Return(tc.exists, tc.existsErr))
+					calls = append(calls, storage.EXPECT().UserExists(ctx, tc.userID).
+						Return(tc.exists, tc.existsErr))
 					if tc.exists && tc.existsErr == nil {
-						calls = append(calls, storage.EXPECT().AddOrder(ctx, tc.userID, tc.number).Return(tc.created, tc.addErr))
+						calls = append(calls, storage.EXPECT().AddOrder(ctx, tc.userID, tc.number).
+							Return(tc.created, tc.addErr))
 					}
 				}
 			}
+
 			gomock.InOrder(calls...)
 
 			created, err := service.NewOrder(storage, validator).Upload(ctx, tc.userID, tc.raw)
@@ -167,6 +171,7 @@ func TestOrderList(t *testing.T) {
 			wantErr: storageErr,
 		},
 	}
+
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
@@ -177,7 +182,8 @@ func TestOrderList(t *testing.T) {
 			if tc.userID > 0 {
 				check := storage.EXPECT().UserExists(ctx, tc.userID).Return(tc.exists, tc.existsErr)
 				if tc.exists && tc.existsErr == nil {
-					storage.EXPECT().ListOrdersByUser(ctx, tc.userID).Return(tc.orders, tc.listErr).After(check)
+					storage.EXPECT().ListOrdersByUser(ctx, tc.userID).Return(tc.orders, tc.listErr).
+						After(check)
 				}
 			}
 

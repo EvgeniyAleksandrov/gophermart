@@ -2,10 +2,9 @@ package service
 
 import "github.com/EvgeniyAleksandrov/gophermart/internal/model"
 
-// OrderNumberValidator validates ASCII order numbers using the Luhn checksum.
-type OrderNumberValidator struct{}
+type OrderNumberValidator struct {
+}
 
-// NewOrderNumberValidator constructs a stateless validator.
 func NewOrderNumberValidator() *OrderNumberValidator {
 	return &OrderNumberValidator{}
 }
@@ -23,6 +22,7 @@ func (v *OrderNumberValidator) Validate(number string) error {
 
 	sum := 0
 	double := false
+
 	for i := len(number) - 1; i >= 0; i-- {
 		if number[i] < '0' || number[i] > '9' {
 			return model.ErrInvalidOrderNumber

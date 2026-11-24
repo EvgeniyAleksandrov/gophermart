@@ -12,16 +12,13 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Validator checks configuration syntax without modifying values or opening connections.
-type Validator struct{}
+type Validator struct {
+}
 
-// NewValidator constructs a stateless configuration validator.
 func NewValidator() *Validator {
 	return &Validator{}
 }
 
-// Validate returns the first error in listen address, database URI, accrual address,
-// then JWT secret order. Error wrappers describe actions; underlying errors never contain credentials.
 func (v *Validator) Validate(cfg *Config) error {
 	if cfg == nil {
 		return ErrConfigNil

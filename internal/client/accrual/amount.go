@@ -8,13 +8,11 @@ import (
 	"github.com/EvgeniyAleksandrov/gophermart/internal/model"
 )
 
-// AmountParser converts JSON decimal numbers into exact rounded hundredths.
-type AmountParser struct{}
+type AmountParser struct {
+}
 
-// NewAmountParser constructs a stateless parser.
 func NewAmountParser() *AmountParser { return &AmountParser{} }
 
-// Parse rounds half upward and validates the range after rounding, without float64.
 func (p *AmountParser) Parse(raw json.RawMessage) (int64, error) {
 	raw = bytes.TrimSpace(raw)
 	if len(raw) == 0 || bytes.Equal(raw, []byte("null")) {
@@ -24,10 +22,12 @@ func (p *AmountParser) Parse(raw json.RawMessage) (int64, error) {
 	if !json.Valid(raw) || (raw[0] != '-' && (raw[0] < '0' || raw[0] > '9')) {
 		return 0, model.ErrAccrualInvalidResponse
 	}
+
 	value, ok := new(big.Rat).SetString(string(raw))
 	if !ok || value.Sign() < 0 {
 		return 0, model.ErrAccrualInvalidResponse
 	}
+
 	value.Mul(value, big.NewRat(100, 1))
 	quotient, remainder := new(big.Int), new(big.Int)
 	quotient.QuoRem(value.Num(), value.Denom(), remainder)

@@ -15,41 +15,37 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockTokenVerifier is a mock of TokenVerifier interface.
 type MockTokenVerifier struct {
 	ctrl     *gomock.Controller
 	recorder *MockTokenVerifierMockRecorder
 	isgomock struct{}
 }
 
-// MockTokenVerifierMockRecorder is the mock recorder for MockTokenVerifier.
 type MockTokenVerifierMockRecorder struct {
 	mock *MockTokenVerifier
 }
 
-// NewMockTokenVerifier creates a new mock instance.
 func NewMockTokenVerifier(ctrl *gomock.Controller) *MockTokenVerifier {
 	mock := &MockTokenVerifier{ctrl: ctrl}
 	mock.recorder = &MockTokenVerifierMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockTokenVerifier) EXPECT() *MockTokenVerifierMockRecorder {
 	return m.recorder
 }
 
-// Verify mocks base method.
 func (m *MockTokenVerifier) Verify(raw string) (int64, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Verify", raw)
 	ret0, _ := ret[0].(int64)
 	ret1, _ := ret[1].(error)
+
 	return ret0, ret1
 }
 
-// Verify indicates an expected call of Verify.
 func (mr *MockTokenVerifierMockRecorder) Verify(raw any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockTokenVerifier)(nil).Verify), raw)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockTokenVerifier)(nil).
+		Verify), raw)
 }

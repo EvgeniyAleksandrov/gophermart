@@ -15,93 +15,85 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockPasswordHasher is a mock of PasswordHasher interface.
 type MockPasswordHasher struct {
 	ctrl     *gomock.Controller
 	recorder *MockPasswordHasherMockRecorder
 	isgomock struct{}
 }
 
-// MockPasswordHasherMockRecorder is the mock recorder for MockPasswordHasher.
 type MockPasswordHasherMockRecorder struct {
 	mock *MockPasswordHasher
 }
 
-// NewMockPasswordHasher creates a new mock instance.
 func NewMockPasswordHasher(ctrl *gomock.Controller) *MockPasswordHasher {
 	mock := &MockPasswordHasher{ctrl: ctrl}
 	mock.recorder = &MockPasswordHasherMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockPasswordHasher) EXPECT() *MockPasswordHasherMockRecorder {
 	return m.recorder
 }
 
-// Hash mocks base method.
 func (m *MockPasswordHasher) Hash(password string) string {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Hash", password)
 	ret0, _ := ret[0].(string)
+
 	return ret0
 }
 
-// Hash indicates an expected call of Hash.
 func (mr *MockPasswordHasherMockRecorder) Hash(password any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Hash", reflect.TypeOf((*MockPasswordHasher)(nil).Hash), password)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Hash", reflect.TypeOf((*MockPasswordHasher)(nil).
+		Hash), password)
 }
 
-// Matches mocks base method.
 func (m *MockPasswordHasher) Matches(password, hash string) bool {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Matches", password, hash)
 	ret0, _ := ret[0].(bool)
+
 	return ret0
 }
 
-// Matches indicates an expected call of Matches.
 func (mr *MockPasswordHasherMockRecorder) Matches(password, hash any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Matches", reflect.TypeOf((*MockPasswordHasher)(nil).Matches), password, hash)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Matches", reflect.TypeOf((*MockPasswordHasher)(nil).
+		Matches), password, hash)
 }
 
-// MockTokenIssuer is a mock of TokenIssuer interface.
 type MockTokenIssuer struct {
 	ctrl     *gomock.Controller
 	recorder *MockTokenIssuerMockRecorder
 	isgomock struct{}
 }
 
-// MockTokenIssuerMockRecorder is the mock recorder for MockTokenIssuer.
 type MockTokenIssuerMockRecorder struct {
 	mock *MockTokenIssuer
 }
 
-// NewMockTokenIssuer creates a new mock instance.
 func NewMockTokenIssuer(ctrl *gomock.Controller) *MockTokenIssuer {
 	mock := &MockTokenIssuer{ctrl: ctrl}
 	mock.recorder = &MockTokenIssuerMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockTokenIssuer) EXPECT() *MockTokenIssuerMockRecorder {
 	return m.recorder
 }
 
-// Issue mocks base method.
 func (m *MockTokenIssuer) Issue(userID int64) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Issue", userID)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
+
 	return ret0, ret1
 }
 
-// Issue indicates an expected call of Issue.
 func (mr *MockTokenIssuerMockRecorder) Issue(userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Issue", reflect.TypeOf((*MockTokenIssuer)(nil).Issue), userID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Issue", reflect.TypeOf((*MockTokenIssuer)(nil).
+		Issue), userID)
 }

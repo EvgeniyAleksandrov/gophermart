@@ -102,13 +102,16 @@ func TestDBStorageAddUser(t *testing.T) {
 
 			if tc.beginErr == nil {
 				insert := mock.ExpectQuery(regexp.QuoteMeta(insertUserSQL)).WithArgs("Alice", "hash")
+
 				switch {
 				case tc.insertErr != nil:
 					insert.WillReturnError(tc.insertErr)
 				case tc.scanError:
-					insert.WillReturnRows(sqlmock.NewRows([]string{"id", "login", "password_hash"}).AddRow("bad id", "Alice", "hash"))
+					insert.WillReturnRows(sqlmock.NewRows([]string{"id", "login", "password_hash"}).
+						AddRow("bad id", "Alice", "hash"))
 				default:
-					insert.WillReturnRows(sqlmock.NewRows([]string{"id", "login", "password_hash"}).AddRow(42, "Alice", "hash"))
+					insert.WillReturnRows(sqlmock.NewRows([]string{"id", "login", "password_hash"}).
+						AddRow(42, "Alice", "hash"))
 				}
 
 				if tc.insertErr == nil && !tc.scanError {
@@ -135,7 +138,8 @@ func TestDBStorageAddUser(t *testing.T) {
 				}
 			}
 
-			user, err := postgres.NewDBStorage(db, singleAttempt(t)).AddUser(context.Background(), "Alice", "hash")
+			user, err := postgres.NewDBStorage(db, singleAttempt(t)).
+				AddUser(context.Background(), "Alice", "hash")
 			if tc.wantErr != nil || tc.scanError {
 				require.Error(t, err)
 				require.Equal(t, model.User{}, user)
@@ -176,7 +180,8 @@ func TestDBStorageFindUserByLogin(t *testing.T) {
 			wantErr:  sqlErr,
 		},
 		"scan failure": {
-			rows:      sqlmock.NewRows([]string{"id", "login", "password_hash"}).AddRow(nil, " Alice ", "hash"),
+			rows: sqlmock.NewRows([]string{"id", "login", "password_hash"}).
+				AddRow(nil, " Alice ", "hash"),
 			scanError: true,
 		},
 	}
@@ -194,7 +199,8 @@ func TestDBStorageFindUserByLogin(t *testing.T) {
 				query.WillReturnRows(tc.rows)
 			}
 
-			user, err := postgres.NewDBStorage(db, singleAttempt(t)).FindUserByLogin(context.Background(), " Alice ")
+			user, err := postgres.NewDBStorage(db, singleAttempt(t)).
+				FindUserByLogin(context.Background(), " Alice ")
 			if tc.wantErr != nil || tc.scanError {
 				require.Error(t, err)
 				require.Equal(t, model.User{}, user)
@@ -241,7 +247,9 @@ func TestDBStorageUserExists(t *testing.T) {
 			db, mock, err := sqlmock.New()
 			require.NoError(t, err)
 			defer db.Close()
-			query := mock.ExpectQuery(regexp.QuoteMeta(`SELECT EXISTS (SELECT 1 FROM public.gophermart_users WHERE id = $1)`)).WithArgs(int64(7))
+
+			query := mock.ExpectQuery(regexp.QuoteMeta(`SELECT EXISTS (SELECT 1 FROM public.gophermart_users WHERE id = $1)`)).
+				WithArgs(int64(7))
 			if tc.queryErr != nil {
 				query.WillReturnError(tc.queryErr)
 			} else {
@@ -259,6 +267,7 @@ func TestDBStorageUserExists(t *testing.T) {
 			if tc.queryErr != nil {
 				require.ErrorIs(t, err, tc.queryErr)
 			}
+
 			require.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
@@ -268,12 +277,15 @@ func TestAddUserRetryWholeTransaction(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
 	defer db.Close()
+
 	mock.ExpectBegin()
-	mock.ExpectQuery(regexp.QuoteMeta(insertUserSQL)).WillReturnRows(sqlmock.NewRows([]string{"id", "login", "password_hash"}).AddRow(1, "Alice", "hash"))
+	mock.ExpectQuery(regexp.QuoteMeta(insertUserSQL)).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "login", "password_hash"}).AddRow(1, "Alice", "hash"))
 	mock.ExpectExec(regexp.QuoteMeta(insertBalanceSQL)).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit().WillReturnError(&pgconn.PgError{Code: "40001"})
 	mock.ExpectBegin()
-	mock.ExpectQuery(regexp.QuoteMeta(insertUserSQL)).WillReturnRows(sqlmock.NewRows([]string{"id", "login", "password_hash"}).AddRow(2, "Alice", "hash"))
+	mock.ExpectQuery(regexp.QuoteMeta(insertUserSQL)).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "login", "password_hash"}).AddRow(2, "Alice", "hash"))
 	mock.ExpectExec(regexp.QuoteMeta(insertBalanceSQL)).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 	user, err := postgres.NewDBStorage(db, retryPolicy(t, 5)).AddUser(context.Background(), "Alice", "hash")
@@ -286,18 +298,23 @@ func TestAddUserUnknownCommitCannotReplayEvenWhenMatched(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
 	defer db.Close()
+
 	failure := &pgconn.PgError{Code: "08006", Message: "lost acknowledgement"}
 	mock.ExpectBegin()
-	mock.ExpectQuery(regexp.QuoteMeta(insertUserSQL)).WillReturnRows(sqlmock.NewRows([]string{"id", "login", "password_hash"}).AddRow(1, "Alice", "hash"))
+	mock.ExpectQuery(regexp.QuoteMeta(insertUserSQL)).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "login", "password_hash"}).AddRow(1, "Alice", "hash"))
 	mock.ExpectExec(regexp.QuoteMeta(insertBalanceSQL)).WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit().WillReturnError(failure)
 	policy, err := strategy.NewExponential(5, 0, time.Second, strategy.NewSQLState([]string{"08006"}))
 	require.NoError(t, err)
-	user, err := postgres.NewDBStorage(db, retry.NewRetryer(policy)).AddUser(context.Background(), "Alice", "hash")
+	user, err := postgres.NewDBStorage(db, retry.NewRetryer(policy)).
+		AddUser(context.Background(), "Alice", "hash")
 	require.Zero(t, user)
 	require.ErrorIs(t, err, failure)
+
 	var unknown *postgres.OutcomeUnknownError
 	require.ErrorAs(t, err, &unknown)
+
 	var permanent *retry.PermanentError
 	require.ErrorAs(t, err, &permanent)
 	require.NoError(t, mock.ExpectationsWereMet())

@@ -14,6 +14,7 @@ import (
 
 func TestBalanceGet(t *testing.T) {
 	failure := errors.New("database failed")
+
 	for name, tc := range map[string]struct {
 		userID     int64
 		exists     bool
@@ -72,15 +73,19 @@ func TestBalanceGet(t *testing.T) {
 			balance := model.Balance{Current: 123, Withdrawn: 456}
 			var calls []any
 			if tc.userID > 0 {
-				calls = append(calls, storage.EXPECT().UserExists(ctx, tc.userID).Return(tc.exists, tc.existsErr))
+				calls = append(calls, storage.EXPECT().UserExists(ctx, tc.userID).
+					Return(tc.exists, tc.existsErr))
 			}
 
 			if tc.exists && tc.existsErr == nil {
-				calls = append(calls, storage.EXPECT().GetBalance(ctx, tc.userID).Return(balance, tc.balanceErr))
+				calls = append(calls, storage.EXPECT().GetBalance(ctx, tc.userID).
+					Return(balance, tc.balanceErr))
 				if tc.balanceErr == model.ErrBalanceNotFound {
-					calls = append(calls, storage.EXPECT().UserExists(ctx, tc.userID).Return(!tc.deleted, tc.recheckErr))
+					calls = append(calls, storage.EXPECT().UserExists(ctx, tc.userID).
+						Return(!tc.deleted, tc.recheckErr))
 				}
 			}
+
 			gomock.InOrder(calls...)
 			got, err := service.NewBalance(storage).Get(ctx, tc.userID)
 			if tc.wantErr != nil {
@@ -88,6 +93,7 @@ func TestBalanceGet(t *testing.T) {
 				require.Zero(t, got)
 				return
 			}
+
 			require.NoError(t, err)
 			require.Equal(t, balance, got)
 		})

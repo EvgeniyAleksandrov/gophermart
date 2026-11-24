@@ -10,13 +10,11 @@ import (
 	"github.com/EvgeniyAleksandrov/gophermart/internal/model"
 )
 
-// Login handles POST /api/user/login.
 type Login struct {
 	service AuthService
 	logger  interfaces.Logger
 }
 
-// NewLogin receives the authentication service and shared logger.
 func NewLogin(service AuthService, logger interfaces.Logger) *Login {
 	return &Login{
 		service: service,
@@ -39,6 +37,7 @@ func (h *Login) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	token, err := h.service.Login(ctx, credentials.Login, credentials.Password)
+
 	switch {
 	case errors.Is(err, model.ErrInvalidCredentialsInput):
 		http.Error(w, "invalid request", http.StatusBadRequest)

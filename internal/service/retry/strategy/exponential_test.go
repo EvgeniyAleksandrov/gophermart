@@ -14,8 +14,14 @@ import (
 
 func TestExponentialNext(t *testing.T) {
 	serial := &pgconn.PgError{Code: "40001"}
-	policy, err := strategy.NewExponential(5, time.Second, 10*time.Second, strategy.NewSQLState([]string{"40001", "40P01"}))
+	policy, err := strategy.NewExponential(
+		5,
+		time.Second,
+		10*time.Second,
+		strategy.NewSQLState([]string{"40001", "40P01"}),
+	)
 	require.NoError(t, err)
+
 	for name, tc := range map[string]struct {
 		attempt int
 		err     error
@@ -76,6 +82,7 @@ func TestExponentialNext(t *testing.T) {
 func TestExponentialBounds(t *testing.T) {
 	checker := strategy.NewSQLState([]string{"40001"})
 	failure := &pgconn.PgError{Code: "40001"}
+
 	for name, tc := range map[string]struct {
 		initial time.Duration
 		cap     time.Duration

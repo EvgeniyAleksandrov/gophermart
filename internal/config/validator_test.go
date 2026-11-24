@@ -221,7 +221,6 @@ func TestValidator(t *testing.T) {
 			if !tc.valid {
 				require.Error(t, err)
 				require.NotContains(t, err.Error(), "test-secret")
-
 				return
 			}
 

@@ -38,6 +38,7 @@ func TestBalance(t *testing.T) {
 				require.Error(t, err)
 				return
 			}
+
 			require.NoError(t, err)
 			raw, err := json.Marshal(got)
 			require.NoError(t, err)

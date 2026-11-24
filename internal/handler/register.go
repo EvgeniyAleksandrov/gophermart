@@ -10,13 +10,11 @@ import (
 	"github.com/EvgeniyAleksandrov/gophermart/internal/model"
 )
 
-// Register handles POST /api/user/register.
 type Register struct {
 	service AuthService
 	logger  interfaces.Logger
 }
 
-// NewRegister receives the authentication service and shared logger.
 func NewRegister(service AuthService, logger interfaces.Logger) *Register {
 	return &Register{
 		service: service,
@@ -39,6 +37,7 @@ func (h *Register) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	token, err := h.service.Register(ctx, credentials.Login, credentials.Password)
+
 	switch {
 	case errors.Is(err, model.ErrInvalidCredentialsInput):
 		http.Error(w, "invalid request", http.StatusBadRequest)

@@ -17,41 +17,37 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockAccrualClient is a mock of AccrualClient interface.
 type MockAccrualClient struct {
 	ctrl     *gomock.Controller
 	recorder *MockAccrualClientMockRecorder
 	isgomock struct{}
 }
 
-// MockAccrualClientMockRecorder is the mock recorder for MockAccrualClient.
 type MockAccrualClientMockRecorder struct {
 	mock *MockAccrualClient
 }
 
-// NewMockAccrualClient creates a new mock instance.
 func NewMockAccrualClient(ctrl *gomock.Controller) *MockAccrualClient {
 	mock := &MockAccrualClient{ctrl: ctrl}
 	mock.recorder = &MockAccrualClientMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockAccrualClient) EXPECT() *MockAccrualClientMockRecorder {
 	return m.recorder
 }
 
-// Fetch mocks base method.
 func (m *MockAccrualClient) Fetch(arg0 context.Context, arg1 string) (model.AccrualResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Fetch", arg0, arg1)
 	ret0, _ := ret[0].(model.AccrualResult)
 	ret1, _ := ret[1].(error)
+
 	return ret0, ret1
 }
 
-// Fetch indicates an expected call of Fetch.
 func (mr *MockAccrualClientMockRecorder) Fetch(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Fetch", reflect.TypeOf((*MockAccrualClient)(nil).Fetch), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Fetch", reflect.TypeOf((*MockAccrualClient)(nil).
+		Fetch), arg0, arg1)
 }

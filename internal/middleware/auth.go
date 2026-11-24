@@ -1,3 +1,5 @@
+//go:generate go run go.uber.org/mock/mockgen@v0.6.0 -source=auth.go -destination=auth_mock_test.go -package=middleware_test
+
 // Package middleware provides HTTP authorization wrappers.
 package middleware
 
@@ -8,24 +10,18 @@ import (
 	"github.com/EvgeniyAleksandrov/gophermart/internal/requestcontext"
 )
 
-//go:generate go run go.uber.org/mock/mockgen@v0.6.0 -source=auth.go -destination=auth_mock_test.go -package=middleware_test
-
-// TokenVerifier verifies a JWT and returns the authenticated user ID.
 type TokenVerifier interface {
 	Verify(raw string) (int64, error)
 }
 
-// Auth authorizes requests without querying storage or renewing tokens.
 type Auth struct {
 	tokens TokenVerifier
 }
 
-// NewAuth receives the application's shared token verifier.
 func NewAuth(tokens TokenVerifier) *Auth {
 	return &Auth{tokens: tokens}
 }
 
-// Wrap requires exactly one bearer header and supplies the verified ID downstream.
 func (m *Auth) Wrap(next http.Handler) http.Handler {
 	return &authorizedHandler{
 		tokens: m.tokens,

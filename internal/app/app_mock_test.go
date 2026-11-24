@@ -16,77 +16,67 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockStorage is a mock of Storage interface.
 type MockStorage struct {
 	ctrl     *gomock.Controller
 	recorder *MockStorageMockRecorder
 	isgomock struct{}
 }
 
-// MockStorageMockRecorder is the mock recorder for MockStorage.
 type MockStorageMockRecorder struct {
 	mock *MockStorage
 }
 
-// NewMockStorage creates a new mock instance.
 func NewMockStorage(ctrl *gomock.Controller) *MockStorage {
 	mock := &MockStorage{ctrl: ctrl}
 	mock.recorder = &MockStorageMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockStorage) EXPECT() *MockStorageMockRecorder {
 	return m.recorder
 }
 
-// Close mocks base method.
 func (m *MockStorage) Close() error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Close")
 	ret0, _ := ret[0].(error)
+
 	return ret0
 }
 
-// Close indicates an expected call of Close.
 func (mr *MockStorageMockRecorder) Close() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockStorage)(nil).Close))
 }
 
-// MockWorker is a mock of Worker interface.
 type MockWorker struct {
 	ctrl     *gomock.Controller
 	recorder *MockWorkerMockRecorder
 	isgomock struct{}
 }
 
-// MockWorkerMockRecorder is the mock recorder for MockWorker.
 type MockWorkerMockRecorder struct {
 	mock *MockWorker
 }
 
-// NewMockWorker creates a new mock instance.
 func NewMockWorker(ctrl *gomock.Controller) *MockWorker {
 	mock := &MockWorker{ctrl: ctrl}
 	mock.recorder = &MockWorkerMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockWorker) EXPECT() *MockWorkerMockRecorder {
 	return m.recorder
 }
 
-// Run mocks base method.
 func (m *MockWorker) Run(arg0 context.Context) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Run", arg0)
 	ret0, _ := ret[0].(error)
+
 	return ret0
 }
 
-// Run indicates an expected call of Run.
 func (mr *MockWorkerMockRecorder) Run(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Run", reflect.TypeOf((*MockWorker)(nil).Run), arg0)

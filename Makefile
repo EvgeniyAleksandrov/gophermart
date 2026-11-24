@@ -1,4 +1,4 @@
-.PHONY: build run test run-accrual
+.PHONY: build run test run-accrual generate test-race coverage
 
 RUN_ADDRESS ?= :8080
 DATABASE_URI ?= host=localhost port=5432 dbname=gophermart user=postgres password=postgres sslmode=disable
@@ -17,6 +17,17 @@ run: build
 
 test:
 	go test ./...
+
+generate:
+	go generate ./...
+
+test-race:
+	go test -race -count=1 ./...
+
+coverage:
+	go test -count=1 -coverpkg=./... -coverprofile=coverage.out ./...
+	go tool cover -func=coverage.out
+	go tool cover -html=coverage.out -o coverage.html
 
 run-accrual:
 	@set -eu; \

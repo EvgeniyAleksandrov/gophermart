@@ -1,8 +1,8 @@
-package accrual
+package dto
 
 import "encoding/json"
 
-type responseDTO struct {
+type AccrualResponse struct {
 	Order   string          `json:"order"`
 	Status  string          `json:"status"`
 	Accrual json.RawMessage `json:"accrual"`

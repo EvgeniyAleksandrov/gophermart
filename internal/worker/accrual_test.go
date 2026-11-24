@@ -54,16 +54,18 @@ func TestAccrualQueue(t *testing.T) {
 				processor := NewMockProcessor(gomock.NewController(t))
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
+
 				started := time.Now()
 				orders := []model.Order{{ID: 1}, {ID: 2}}
 				if tc.empty {
 					orders = nil
 				}
 
-				calls := []any{processor.EXPECT().Pending(ctx).DoAndReturn(func(context.Context) ([]model.Order, error) {
-					require.Zero(t, time.Since(started), "first pass must start immediately")
-					return orders, tc.pendingErr
-				})}
+				calls := []any{processor.EXPECT().Pending(ctx).
+					DoAndReturn(func(context.Context) ([]model.Order, error) {
+						require.Zero(t, time.Since(started), "first pass must start immediately")
+						return orders, tc.pendingErr
+					})}
 				if !tc.empty && tc.pendingErr == nil {
 					calls = append(calls, processor.EXPECT().Process(ctx, orders[0]).Return(tc.processErr))
 					var persistence *model.PersistenceError
@@ -71,11 +73,18 @@ func TestAccrualQueue(t *testing.T) {
 						calls = append(calls, processor.EXPECT().Process(ctx, orders[1]).Return(nil))
 					}
 				}
-				calls = append(calls, processor.EXPECT().Pending(ctx).DoAndReturn(func(context.Context) ([]model.Order, error) {
-					require.Equal(t, time.Second, time.Since(started), "next pass follows the poll interval")
-					cancel()
-					return nil, nil
-				}))
+
+				calls = append(calls, processor.EXPECT().Pending(ctx).
+					DoAndReturn(func(context.Context) ([]model.Order, error) {
+						require.Equal(
+							t,
+							time.Second,
+							time.Since(started),
+							"next pass follows the poll interval",
+						)
+						cancel()
+						return nil, nil
+					}))
 				gomock.InOrder(calls...)
 				require.NoError(t, worker.NewAccrual(processor, zap.NewNop()).Run(ctx))
 			})
@@ -101,16 +110,20 @@ func TestAccrualCancellation(t *testing.T) {
 				processor := NewMockProcessor(gomock.NewController(t))
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
+
 				order := model.Order{ID: 1}
+
 				switch {
 				case tc.before:
 					cancel()
 				case tc.duringRequest:
 					processor.EXPECT().Pending(ctx).Return([]model.Order{order}, nil)
-					processor.EXPECT().Process(ctx, order).DoAndReturn(func(context.Context, model.Order) error { cancel(); return ctx.Err() })
+					processor.EXPECT().Process(ctx, order).
+						DoAndReturn(func(context.Context, model.Order) error { cancel(); return ctx.Err() })
 				default:
 					processor.EXPECT().Pending(ctx).Return(nil, nil)
 				}
+
 				done := make(chan error, 1)
 				go func() { done <- worker.NewAccrual(processor, zap.NewNop()).Run(ctx) }()
 				synctest.Wait()
@@ -126,12 +139,34 @@ func TestAccrualRateLimitKeepsQueueOnSameOrder(t *testing.T) {
 	storage := mock.NewMockDBStorage(ctrl)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	orders := []model.Order{{ID: 1, UserID: 7, Number: "18"}, {ID: 2, UserID: 7, Number: "26"}}
 	storage.EXPECT().ListPending(ctx).Return(orders, nil)
 	gomock.InOrder(
-		storage.EXPECT().ApplyAccrual(ctx, int64(1), int64(7), model.AccrualResult{Number: "18", Status: model.AccrualProcessed}).Return(nil),
-		storage.EXPECT().ApplyAccrual(ctx, int64(2), int64(7), model.AccrualResult{Number: "26", Status: model.AccrualProcessed}).DoAndReturn(func(context.Context, int64, int64, model.AccrualResult) error { cancel(); return nil }),
+		storage.EXPECT().
+			ApplyAccrual(
+				ctx,
+				int64(1),
+				int64(7),
+				model.AccrualResult{Number: "18", Status: model.AccrualProcessed},
+			).Return(nil),
+		storage.EXPECT().
+			ApplyAccrual(
+				ctx,
+				int64(2),
+				int64(7),
+				model.AccrualResult{Number: "26", Status: model.AccrualProcessed},
+			).DoAndReturn(func(
+			context.Context,
+			int64,
+			int64,
+			model.AccrualResult,
+		) error {
+			cancel()
+			return nil
+		}),
 	)
+
 	var paths []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		paths = append(paths, r.URL.Path)
@@ -140,10 +175,12 @@ func TestAccrualRateLimitKeepsQueueOnSameOrder(t *testing.T) {
 			w.WriteHeader(429)
 			return
 		}
+
 		number := strings.TrimPrefix(r.URL.Path, "/api/orders/")
 		fmt.Fprintf(w, `{"order":%q,"status":"PROCESSED"}`, number)
 	}))
 	defer server.Close()
+
 	client := accrual.NewClient(server.URL, server.Client(), retry.NewRetryer(strategy.NewRateLimit()))
 	processor := service.NewAccrual(storage, client)
 	require.NoError(t, worker.NewAccrual(processor, zap.NewNop()).Run(ctx))

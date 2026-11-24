@@ -45,6 +45,7 @@ func TestRateLimit(t *testing.T) {
 			require.Equal(t, tc.again, again)
 		})
 	}
+
 	_, again := strategy.NewRateLimit().Next(0, &model.RateLimitError{})
 	require.False(t, again)
 }

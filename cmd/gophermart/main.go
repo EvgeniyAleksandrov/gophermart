@@ -31,7 +31,6 @@ func main() {
 	if err != nil {
 		logger.Error("load config", zap.Error(err))
 		exitCode = 1
-
 		return
 	}
 
@@ -39,7 +38,6 @@ func main() {
 	if err != nil {
 		logger.Error("build app", zap.Error(err))
 		exitCode = 1
-
 		return
 	}
 
@@ -49,7 +47,6 @@ func main() {
 	if err := application.Run(ctx); err != nil {
 		logger.Error("run app", zap.Error(err))
 		exitCode = 1
-
 		return
 	}
 

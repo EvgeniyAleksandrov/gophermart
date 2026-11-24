@@ -48,6 +48,7 @@ func TestAccrualProcess(t *testing.T) {
 
 			s := service.NewAccrual(storage, client)
 			err := s.Process(ctx, order)
+
 			switch {
 			case tc.fetchErr != nil:
 				require.ErrorIs(t, err, tc.fetchErr)
@@ -58,6 +59,7 @@ func TestAccrualProcess(t *testing.T) {
 			default:
 				require.NoError(t, err)
 			}
+
 			storage.EXPECT().ListPending(ctx).Return([]model.Order{order}, nil)
 			orders, err := s.Pending(ctx)
 			require.NoError(t, err)

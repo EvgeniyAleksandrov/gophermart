@@ -1,3 +1,5 @@
+//go:generate go run go.uber.org/mock/mockgen@v0.6.0 -source=storage.go -destination=mock/storage_mock.go -package=mock
+
 package interfaces
 
 import (
@@ -6,10 +8,12 @@ import (
 	"github.com/EvgeniyAleksandrov/gophermart/internal/model"
 )
 
-//go:generate go run go.uber.org/mock/mockgen@v0.6.0 -source=storage.go -destination=mock/storage_mock.go -package=mock
-
-// DBStorage exposes database operations to consumers, excluding lifecycle ownership.
 type DBStorage interface {
+	// Withdraw atomically debits the balance; matching repeats leave all data unchanged.
+	Withdraw(ctx context.Context, userID int64, number string, sum int64) error
+	// ListWithdrawalsByUser returns complete history by processed time and ID descending.
+	ListWithdrawalsByUser(ctx context.Context, userID int64) ([]model.Withdrawal, error)
+
 	// ListPending returns all unfinished orders in ID order.
 	ListPending(context.Context) ([]model.Order, error)
 	// ApplyAccrual updates order and balance atomically and idempotently.

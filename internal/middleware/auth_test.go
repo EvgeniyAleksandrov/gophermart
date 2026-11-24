@@ -71,10 +71,13 @@ func TestAuth(t *testing.T) {
 
 			parent, cancel := context.WithCancel(context.Background())
 			defer cancel()
+
 			request := httptest.NewRequest(http.MethodGet, "/test-only", nil).WithContext(parent)
+
 			for _, value := range tc.headers {
 				request.Header.Add("Authorization", value)
 			}
+
 			called := false
 			userContext := requestcontext.NewUser()
 			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

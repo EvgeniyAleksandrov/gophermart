@@ -25,6 +25,7 @@ type migrationFixture struct {
 
 func (f *migrationFixture) setup(t *testing.T) {
 	t.Helper()
+
 	var err error
 	f.db, f.mock, err = sqlmock.New(sqlmock.MonitorPingsOption(true))
 	require.NoError(t, err)
@@ -34,36 +35,49 @@ func (f *migrationFixture) setup(t *testing.T) {
 func (f *migrationFixture) settings() {
 	f.mock.ExpectQuery(regexp.QuoteMeta("SELECT current_setting('statement_timeout'), current_setting('lock_timeout')")).
 		WillReturnRows(sqlmock.NewRows([]string{"statement", "lock"}).AddRow("2min", "1s"))
-	f.mock.ExpectExec(regexp.QuoteMeta(settingsSQL)).WithArgs("30000ms", "5000ms").WillReturnResult(sqlmock.NewResult(0, 1))
+	f.mock.ExpectExec(regexp.QuoteMeta(settingsSQL)).WithArgs("30000ms", "5000ms").
+		WillReturnResult(sqlmock.NewResult(0, 1))
 }
 
 func (f *migrationFixture) initialize() {
 	f.mock.ExpectPing()
-	f.mock.ExpectQuery("SELECT CURRENT_DATABASE").WillReturnRows(sqlmock.NewRows([]string{"database"}).AddRow("test"))
-	f.mock.ExpectExec("SELECT pg_advisory_lock").WithArgs(sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(0, 1))
-	f.mock.ExpectQuery("SELECT COUNT").WithArgs("public", "gophermart_schema_migrations").WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
-	f.mock.ExpectExec(`CREATE TABLE IF NOT EXISTS "public"."gophermart_schema_migrations"`).WillReturnResult(sqlmock.NewResult(0, 1))
-	f.mock.ExpectExec("SELECT pg_advisory_unlock").WithArgs(sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(0, 1))
+	f.mock.ExpectQuery("SELECT CURRENT_DATABASE").
+		WillReturnRows(sqlmock.NewRows([]string{"database"}).AddRow("test"))
+	f.mock.ExpectExec("SELECT pg_advisory_lock").WithArgs(sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	f.mock.ExpectQuery("SELECT COUNT").WithArgs("public", "gophermart_schema_migrations").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+	f.mock.ExpectExec(`CREATE TABLE IF NOT EXISTS "public"."gophermart_schema_migrations"`).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	f.mock.ExpectExec("SELECT pg_advisory_unlock").WithArgs(sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 }
 
 func (f *migrationFixture) version(version int, dirty bool) {
-	f.mock.ExpectExec("SELECT pg_advisory_lock").WithArgs(sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(0, 1))
+	f.mock.ExpectExec("SELECT pg_advisory_lock").WithArgs(sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	rows := sqlmock.NewRows([]string{"version", "dirty"})
 	if version >= 0 {
 		rows.AddRow(version, dirty)
 	}
-	f.mock.ExpectQuery(`SELECT version, dirty FROM "public"."gophermart_schema_migrations" LIMIT 1`).WillReturnRows(rows)
+
+	f.mock.ExpectQuery(`SELECT version, dirty FROM "public"."gophermart_schema_migrations" LIMIT 1`).
+		WillReturnRows(rows)
 }
 
 func (f *migrationFixture) setVersion(version int, dirty bool) {
 	f.mock.ExpectBegin()
-	f.mock.ExpectExec(`TRUNCATE "public"."gophermart_schema_migrations"`).WillReturnResult(sqlmock.NewResult(0, 1))
-	f.mock.ExpectExec(`INSERT INTO "public"."gophermart_schema_migrations"`).WithArgs(version, dirty).WillReturnResult(sqlmock.NewResult(0, 1))
+	f.mock.ExpectExec(`TRUNCATE "public"."gophermart_schema_migrations"`).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	f.mock.ExpectExec(`INSERT INTO "public"."gophermart_schema_migrations"`).WithArgs(version, dirty).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	f.mock.ExpectCommit()
 }
 
 func (f *migrationFixture) restore(err error) {
-	f.mock.ExpectExec(regexp.QuoteMeta(settingsSQL)).WithArgs("2min", "1s").WillReturnResult(sqlmock.NewResult(0, 1)).WillReturnError(err)
+	f.mock.ExpectExec(regexp.QuoteMeta(settingsSQL)).WithArgs("2min", "1s").
+		WillReturnResult(sqlmock.NewResult(0, 1)).
+		WillReturnError(err)
 }
 
 func TestMigratorUp(t *testing.T) {
@@ -109,6 +123,7 @@ func TestMigratorUp(t *testing.T) {
 						expectation.WillReturnError(failure)
 						break
 					}
+
 					expectation.WillReturnResult(sqlmock.NewResult(0, 1))
 					fixture.setVersion(version+1, false)
 				}
@@ -116,14 +131,19 @@ func TestMigratorUp(t *testing.T) {
 
 			if tc.version < 0 && !tc.ddlError {
 				fixture.setVersion(5, true)
-				fixture.mock.ExpectExec("CREATE INDEX gophermart_orders_pending_id_idx").WillReturnResult(sqlmock.NewResult(0, 1))
+				fixture.mock.ExpectExec("CREATE INDEX gophermart_orders_pending_id_idx").
+					WillReturnResult(sqlmock.NewResult(0, 1))
 				fixture.setVersion(5, false)
 			}
-			fixture.mock.ExpectExec("SELECT pg_advisory_unlock").WithArgs(sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(0, 1))
+
+			fixture.mock.ExpectExec("SELECT pg_advisory_unlock").WithArgs(sqlmock.AnyArg()).
+				WillReturnResult(sqlmock.NewResult(0, 1))
+
 			var restoreErr error
 			if tc.restoreError {
 				restoreErr = failure
 			}
+
 			fixture.restore(restoreErr)
 			failed := tc.dirty || tc.ddlError || tc.restoreError
 			if failed {
@@ -144,6 +164,7 @@ func TestMigratorUp(t *testing.T) {
 				require.ErrorAs(t, err, &dirty)
 				require.Equal(t, 2, dirty.Version)
 			}
+
 			require.NoError(t, fixture.mock.ExpectationsWereMet())
 		})
 	}
@@ -169,7 +190,8 @@ func TestMigratorSourceAndCancellation(t *testing.T) {
 	require.Error(t, postgres.NewMigrator(fixture.db, fstest.MapFS{}).Up(context.Background()))
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	require.ErrorIs(t, postgres.NewMigrator(fixture.db, migrations.NewSource().FS()).Up(ctx), context.Canceled)
+	require.ErrorIs(t, postgres.NewMigrator(fixture.db, migrations.NewSource().FS()).
+		Up(ctx), context.Canceled)
 	require.NoError(t, fixture.mock.ExpectationsWereMet())
 }
 
@@ -193,9 +215,11 @@ func TestMigratorTimeoutSetupFailure(t *testing.T) {
 				read.WillReturnError(failure)
 			} else {
 				read.WillReturnRows(sqlmock.NewRows([]string{"statement", "lock"}).AddRow("2min", "1s"))
-				fixture.mock.ExpectExec(regexp.QuoteMeta(settingsSQL)).WithArgs("30000ms", "5000ms").WillReturnError(failure)
+				fixture.mock.ExpectExec(regexp.QuoteMeta(settingsSQL)).WithArgs("30000ms", "5000ms").
+					WillReturnError(failure)
 				fixture.restore(nil)
 			}
+
 			fixture.mock.ExpectClose()
 
 			err := postgres.NewMigrator(fixture.db, migrations.NewSource().FS()).Up(context.Background())
@@ -206,8 +230,6 @@ func TestMigratorTimeoutSetupFailure(t *testing.T) {
 	}
 }
 
-// cancelOnArgument cancels the application context during the adapter's final
-// unlock, before Up returns. Cleanup must still restore the session settings.
 type cancelOnArgument struct {
 	cancel context.CancelFunc
 }
@@ -225,6 +247,7 @@ func TestMigratorCancellationDuringUp(t *testing.T) {
 	fixture.version(5, false)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	fixture.mock.ExpectExec("SELECT pg_advisory_unlock").
 		WithArgs(cancelOnArgument{cancel: cancel}).WillReturnResult(sqlmock.NewResult(0, 1))
 	fixture.restore(nil)

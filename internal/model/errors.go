@@ -3,6 +3,13 @@ package model
 import "errors"
 
 var (
+	// ErrInvalidWithdrawalAmount indicates a nonpositive or inexact amount, or overflow.
+	ErrInvalidWithdrawalAmount = errors.New("invalid withdrawal amount")
+	// ErrInsufficientFunds indicates that a new withdrawal exceeds the current balance.
+	ErrInsufficientFunds = errors.New("insufficient funds")
+	// ErrWithdrawalConflict indicates an order number used by another owner or amount.
+	ErrWithdrawalConflict = errors.New("withdrawal conflict")
+
 	// ErrAccrualNotRegistered means the external service does not know the order yet.
 	ErrAccrualNotRegistered = errors.New("accrual order not registered")
 	// ErrAccrualUnavailable means an external request failed temporarily.

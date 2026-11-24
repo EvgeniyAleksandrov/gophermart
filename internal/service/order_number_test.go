@@ -62,6 +62,7 @@ func TestOrderNumberValidator(t *testing.T) {
 			wantErr: model.ErrInvalidOrderNumber,
 		},
 	}
+
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			require.ErrorIs(t, service.NewOrderNumberValidator().Validate(tc.number), tc.wantErr)

@@ -1,3 +1,5 @@
+//go:generate go run go.uber.org/mock/mockgen@v0.6.0 -source=retryer.go -destination=retryer_mock_test.go -package=retry_test
+
 // Package retry executes operations with an injected retry strategy.
 package retry
 
@@ -7,19 +9,14 @@ import (
 	"time"
 )
 
-//go:generate go run go.uber.org/mock/mockgen@v0.6.0 -source=retryer.go -destination=retryer_mock_test.go -package=retry_test
-
-// Strategy classifies an error, limits attempts and calculates the next delay.
-// failedAttempt counts the initial failed call as one. Implementations must be
-// safe for concurrent use; attempt counters belong to Do, not to the strategy.
 type Strategy interface {
 	Next(failedAttempt int, err error) (time.Duration, bool)
 }
 
-// Retryer repeats a complete operation without owning its resources or results.
-type Retryer struct{ strategy Strategy }
+type Retryer struct {
+	strategy Strategy
+}
 
-// NewRetryer receives a configured strategy shared by this retryer's callers.
 func NewRetryer(strategy Strategy) *Retryer { return &Retryer{strategy: strategy} }
 
 // Do returns nil on success or the last operation error when retries are refused

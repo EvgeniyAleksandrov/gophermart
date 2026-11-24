@@ -9,18 +9,16 @@ import (
 	"github.com/EvgeniyAleksandrov/gophermart/internal/model"
 )
 
-// Order converts business orders into public response data.
-type Order struct{}
+type Order struct {
+}
 
-// NewOrder constructs a stateless order mapper.
 func NewOrder() *Order {
 	return &Order{}
 }
 
-// Present preserves order and formats timestamps in UTC RFC3339.
-// Nil accrual is omitted; nonnegative hundredths become exact JSON numbers.
 func (m *Order) Present(orders []model.Order) ([]dto.Order, error) {
 	result := make([]dto.Order, 0, len(orders))
+
 	for _, order := range orders {
 		response := dto.Order{
 			Number:     order.Number,
@@ -34,6 +32,7 @@ func (m *Order) Present(orders []model.Order) ([]dto.Order, error) {
 			if err != nil {
 				return nil, fmt.Errorf("present order: %w", err)
 			}
+
 			response.Accrual = &number
 		}
 

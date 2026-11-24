@@ -56,6 +56,7 @@ func TestOrder(t *testing.T) {
 			wantErr: true,
 		},
 	}
+
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			orders := []model.Order{{
@@ -76,7 +77,11 @@ func TestOrder(t *testing.T) {
 			require.NoError(t, err)
 			data, err := json.Marshal(result)
 			require.NoError(t, err)
-			require.Equal(t, `[{"number":"18","status":"`+string(tc.status)+`"`+tc.wantAccrual+`,"uploaded_at":"2026-11-22T09:30:01Z"}]`, string(data))
+			require.Equal(
+				t,
+				`[{"number":"18","status":"`+string(tc.status)+`"`+tc.wantAccrual+`,"uploaded_at":"2026-11-22T09:30:01Z"}]`,
+				string(data),
+			)
 		})
 	}
 }

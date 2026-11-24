@@ -21,13 +21,11 @@ const (
 	migrationLockTimeout      = 5 * time.Second
 )
 
-// Migrator applies embedded SQL on a dedicated connection without owning the pool.
 type Migrator struct {
 	db    *sql.DB
 	files fs.FS
 }
 
-// NewMigrator receives an open pool and a versioned SQL source.
 func NewMigrator(db *sql.DB, files fs.FS) *Migrator {
 	return &Migrator{db: db, files: files}
 }
@@ -57,6 +55,7 @@ func (m *Migrator) Up(ctx context.Context) (err error) {
 				err = errors.Join(err, discardErr)
 			}
 		}
+
 		if runner != nil {
 			sourceErr, databaseErr := runner.Close()
 			err = errors.Join(err, sourceErr, databaseErr)
@@ -94,6 +93,7 @@ func (m *Migrator) Up(ctx context.Context) (err error) {
 	if err != nil {
 		return fmt.Errorf("initialize migrator: %w", err)
 	}
+
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -102,6 +102,7 @@ func (m *Migrator) Up(ctx context.Context) (err error) {
 	if errors.Is(err, migrate.ErrNoChange) {
 		err = nil
 	}
+
 	if err != nil {
 		return err
 	}
@@ -122,6 +123,7 @@ func (s *migrationSettings) apply(ctx context.Context, conn *sql.Conn) error {
 	if err != nil {
 		return fmt.Errorf("read migration timeouts: %w", err)
 	}
+
 	s.saved = true
 
 	_, err = conn.ExecContext(ctx,

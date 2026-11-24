@@ -134,11 +134,16 @@ func TestCredentialsDecode(t *testing.T) {
 func TestCredentialsDecodeReuse(t *testing.T) {
 	credentials := dto.Credentials{}
 	require.NoError(t, credentials.Decode(strings.NewReader(`{"login":"Alice","password":"secret"}`)))
-	require.ErrorIs(t, credentials.Decode(strings.NewReader(`{"login":"Bob"}`)), model.ErrInvalidCredentialsInput)
+	require.ErrorIs(
+		t,
+		credentials.Decode(strings.NewReader(`{"login":"Bob"}`)),
+		model.ErrInvalidCredentialsInput,
+	)
 	require.Empty(t, credentials.Password)
 }
 
-type failedReader struct{}
+type failedReader struct {
+}
 
 func (r *failedReader) Read([]byte) (int, error) {
 	return 0, io.ErrUnexpectedEOF

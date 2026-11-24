@@ -54,43 +54,94 @@ func BuildApp(cfg *config.Config, logger interfaces.Logger) (*app.App, error) {
 		return nil, fmt.Errorf("build server: %w", err)
 	}
 
-	dbStrategy, err := strategy.NewExponential(dbMaxAttempts, dbRetryInitialDelay, dbRetryMaxDelay, strategy.NewSQLState([]string{"40001", "40P01"}))
+	dbStrategy, err := strategy.NewExponential(
+		dbMaxAttempts,
+		dbRetryInitialDelay,
+		dbRetryMaxDelay,
+		strategy.NewSQLState([]string{"40001", "40P01"}),
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	storageBuilder := postgres.NewDBStorageBuilder(cfg.DatabaseURI, migrations.NewSource().FS(), retry.NewRetryer(dbStrategy))
+	storageBuilder := postgres.NewDBStorageBuilder(
+		cfg.DatabaseURI,
+		migrations.NewSource().FS(),
+		retry.NewRetryer(dbStrategy),
+	)
 	storage, err := storageBuilder.Build(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("build storage: %w", err)
 	}
 
 	authService := service.NewAuthService(storage, auth.NewPasswordHasher(), tokens)
-	if err := serverBuilder.AddHandler(http.MethodPost, "/api/user/register", handler.NewRegister(authService, logger)); err != nil {
+	if err := serverBuilder.AddHandler(
+		http.MethodPost,
+		"/api/user/register",
+		handler.NewRegister(authService, logger),
+	); err != nil {
 		return nil, errors.Join(fmt.Errorf("register registration handler: %w", err), storage.Close())
 	}
 
-	if err := serverBuilder.AddHandler(http.MethodPost, "/api/user/login", handler.NewLogin(authService, logger)); err != nil {
+	if err := serverBuilder.AddHandler(
+		http.MethodPost,
+		"/api/user/login",
+		handler.NewLogin(authService, logger),
+	); err != nil {
 		return nil, errors.Join(fmt.Errorf("register login handler: %w", err), storage.Close())
 	}
 
 	orderService := service.NewOrder(storage, service.NewOrderNumberValidator())
 	authorization := middleware.NewAuth(tokens)
-	if err := serverBuilder.AddHandler(http.MethodPost, "/api/user/orders", authorization.Wrap(handler.NewUploadOrder(orderService, logger))); err != nil {
+	if err := serverBuilder.AddHandler(
+		http.MethodPost,
+		"/api/user/orders",
+		authorization.Wrap(handler.NewUploadOrder(orderService, logger)),
+	); err != nil {
 		return nil, errors.Join(fmt.Errorf("register upload order handler: %w", err), storage.Close())
 	}
 
-	if err := serverBuilder.AddHandler(http.MethodGet, "/api/user/orders", authorization.Wrap(handler.NewListOrders(orderService, logger))); err != nil {
+	if err := serverBuilder.AddHandler(
+		http.MethodGet,
+		"/api/user/orders",
+		authorization.Wrap(handler.NewListOrders(orderService, logger)),
+	); err != nil {
 		return nil, errors.Join(fmt.Errorf("register list orders handler: %w", err), storage.Close())
 	}
 
 	balanceService := service.NewBalance(storage)
-	if err := serverBuilder.AddHandler(http.MethodGet, "/api/user/balance", authorization.Wrap(handler.NewBalance(balanceService, logger))); err != nil {
+	if err := serverBuilder.AddHandler(
+		http.MethodGet,
+		"/api/user/balance",
+		authorization.Wrap(handler.NewBalance(balanceService, logger)),
+	); err != nil {
 		return nil, errors.Join(fmt.Errorf("register balance handler: %w", err), storage.Close())
 	}
 
-	client := accrual.NewClient(cfg.AccrualSystemAddress, &http.Client{Timeout: accrualRequestTimeout}, retry.NewRetryer(strategy.NewRateLimit()))
+	withdrawalService := service.NewWithdrawal(storage, service.NewOrderNumberValidator())
+	if err := serverBuilder.AddHandler(
+		http.MethodPost,
+		"/api/user/balance/withdraw",
+		authorization.Wrap(handler.NewWithdraw(withdrawalService, logger)),
+	); err != nil {
+		return nil, errors.Join(fmt.Errorf("register withdraw handler: %w", err), storage.Close())
+	}
+
+	if err := serverBuilder.AddHandler(
+		http.MethodGet,
+		"/api/user/withdrawals",
+		authorization.Wrap(handler.NewListWithdrawals(withdrawalService, logger)),
+	); err != nil {
+		return nil, errors.Join(fmt.Errorf("register list withdrawals handler: %w", err), storage.Close())
+	}
+
+	client := accrual.NewClient(
+		cfg.AccrualSystemAddress,
+		&http.Client{Timeout: accrualRequestTimeout},
+		retry.NewRetryer(strategy.NewRateLimit()),
+	)
 	processor := service.NewAccrual(storage, client)
 	background := worker.NewAccrual(processor, logger)
+
 	return app.NewApp(httpServer, logger, storage, background), nil
 }

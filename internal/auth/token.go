@@ -14,20 +14,17 @@ const tokenTTL = time.Hour
 // ErrInvalidToken reports a rejected token without exposing its contents.
 var ErrInvalidToken = errors.New("invalid token")
 
-// Clock supplies the current time for issuing and validating tokens.
 type Clock interface {
 	Now() time.Time
 }
 
-// SystemClock reads the process wall clock.
-type SystemClock struct{}
+type SystemClock struct {
+}
 
-// NewSystemClock constructs a wall clock.
 func NewSystemClock() *SystemClock {
 	return &SystemClock{}
 }
 
-// Now returns the current time.
 func (c *SystemClock) Now() time.Time {
 	return time.Now()
 }
@@ -39,7 +36,6 @@ type TokenManager struct {
 	parser *jwt.Parser
 }
 
-// NewTokenManager copies the key and configures strict algorithm and time validation.
 func NewTokenManager(key []byte, clock Clock) (*TokenManager, error) {
 	if len(key) < config.MinJWTSecretBytes {
 		return nil, config.ErrJWTSecretTooShort
@@ -57,7 +53,6 @@ func NewTokenManager(key []byte, clock Clock) (*TokenManager, error) {
 	}, nil
 }
 
-// Issue signs only the user ID and issuance/expiration times, with a one-hour TTL.
 func (m *TokenManager) Issue(userID int64) (string, error) {
 	if userID <= 0 {
 		return "", ErrInvalidToken
@@ -73,7 +68,6 @@ func (m *TokenManager) Issue(userID int64) (string, error) {
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(m.key)
 }
 
-// Verify checks the signature and required claims without accessing user storage.
 func (m *TokenManager) Verify(raw string) (int64, error) {
 	claims := &jwt.RegisteredClaims{}
 	token, err := m.parser.ParseWithClaims(raw, claims, m.signingKey)

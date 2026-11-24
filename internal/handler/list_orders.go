@@ -12,7 +12,6 @@ import (
 	"github.com/EvgeniyAleksandrov/gophermart/internal/service/mapper"
 )
 
-// ListOrders handles GET /api/user/orders.
 type ListOrders struct {
 	service     OrderService
 	mapper      *mapper.Order
@@ -20,7 +19,6 @@ type ListOrders struct {
 	logger      interfaces.Logger
 }
 
-// NewListOrders receives the order service and shared logger.
 func NewListOrders(service OrderService, logger interfaces.Logger) *ListOrders {
 	return &ListOrders{
 		service:     service,

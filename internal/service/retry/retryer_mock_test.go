@@ -16,41 +16,37 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockStrategy is a mock of Strategy interface.
 type MockStrategy struct {
 	ctrl     *gomock.Controller
 	recorder *MockStrategyMockRecorder
 	isgomock struct{}
 }
 
-// MockStrategyMockRecorder is the mock recorder for MockStrategy.
 type MockStrategyMockRecorder struct {
 	mock *MockStrategy
 }
 
-// NewMockStrategy creates a new mock instance.
 func NewMockStrategy(ctrl *gomock.Controller) *MockStrategy {
 	mock := &MockStrategy{ctrl: ctrl}
 	mock.recorder = &MockStrategyMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockStrategy) EXPECT() *MockStrategyMockRecorder {
 	return m.recorder
 }
 
-// Next mocks base method.
 func (m *MockStrategy) Next(failedAttempt int, err error) (time.Duration, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Next", failedAttempt, err)
 	ret0, _ := ret[0].(time.Duration)
 	ret1, _ := ret[1].(bool)
+
 	return ret0, ret1
 }
 
-// Next indicates an expected call of Next.
 func (mr *MockStrategyMockRecorder) Next(failedAttempt, err any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Next", reflect.TypeOf((*MockStrategy)(nil).Next), failedAttempt, err)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Next", reflect.TypeOf((*MockStrategy)(nil).
+		Next), failedAttempt, err)
 }

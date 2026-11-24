@@ -9,17 +9,17 @@ import (
 	"github.com/EvgeniyAleksandrov/gophermart/internal/model"
 )
 
-// Balance reads balances after checking user existence.
-type Balance struct{ storage interfaces.DBStorage }
+type Balance struct {
+	storage interfaces.DBStorage
+}
 
-// NewBalance receives prepared storage.
 func NewBalance(storage interfaces.DBStorage) *Balance { return &Balance{storage: storage} }
 
-// Get distinguishes deletion from a missing mandatory balance row.
 func (s *Balance) Get(ctx context.Context, userID int64) (model.Balance, error) {
 	if err := s.checkUser(ctx, userID); err != nil {
 		return model.Balance{}, err
 	}
+
 	balance, err := s.storage.GetBalance(ctx, userID)
 	if errors.Is(err, model.ErrBalanceNotFound) {
 		if userErr := s.checkUser(ctx, userID); userErr != nil {
@@ -38,6 +38,7 @@ func (s *Balance) checkUser(ctx context.Context, userID int64) error {
 	if userID <= 0 {
 		return model.ErrUserNotFound
 	}
+
 	exists, err := s.storage.UserExists(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("check balance user: %w", err)

@@ -64,6 +64,7 @@ func TestUploadOrderResponses(t *testing.T) {
 			body: "internal server error\n",
 		},
 	}
+
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			svc := NewMockOrderService(gomock.NewController(t))
@@ -71,8 +72,13 @@ func TestUploadOrderResponses(t *testing.T) {
 			if resultErr != nil {
 				resultErr = fmt.Errorf("wrapped: %w", resultErr)
 			}
+
 			svc.EXPECT().Upload(gomock.Any(), int64(7), " \n18 ").Return(tc.created, resultErr)
-			req := httptest.NewRequest(http.MethodPost, "/api/user/orders?user_id=999", strings.NewReader(" \n18 "))
+			req := httptest.NewRequest(
+				http.MethodPost,
+				"/api/user/orders?user_id=999",
+				strings.NewReader(" \n18 "),
+			)
 			req = req.WithContext(requestcontext.NewUser().WithID(req.Context(), 7))
 			rec := httptest.NewRecorder()
 			handler.NewUploadOrder(svc, zap.NewNop()).ServeHTTP(rec, req)
@@ -133,13 +139,17 @@ func TestUploadOrderInput(t *testing.T) {
 			code: http.StatusUnprocessableEntity,
 		},
 	}
+
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			storage := mock.NewMockDBStorage(gomock.NewController(t))
 			if tc.code == http.StatusAccepted {
 				check := storage.EXPECT().UserExists(gomock.Any(), int64(7)).Return(true, nil)
-				storage.EXPECT().AddOrder(gomock.Any(), int64(7), strings.TrimSpace(tc.body)).Return(true, nil).After(check)
+				storage.EXPECT().AddOrder(gomock.Any(), int64(7), strings.TrimSpace(tc.body)).
+					Return(true, nil).
+					After(check)
 			}
+
 			svc := service.NewOrder(storage, service.NewOrderNumberValidator())
 			req := httptest.NewRequest(http.MethodPost, "/api/user/orders", strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", tc.contentType)
@@ -153,7 +163,11 @@ func TestUploadOrderInput(t *testing.T) {
 
 func TestUploadOrderReadFailure(t *testing.T) {
 	svc := NewMockOrderService(gomock.NewController(t))
-	req := httptest.NewRequest(http.MethodPost, "/api/user/orders", io.MultiReader(strings.NewReader("18"), iotest.ErrReader(errors.New("read failed"))))
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/user/orders",
+		io.MultiReader(strings.NewReader("18"), iotest.ErrReader(errors.New("read failed"))),
+	)
 	req = req.WithContext(requestcontext.NewUser().WithID(req.Context(), 7))
 	rec := httptest.NewRecorder()
 	handler.NewUploadOrder(svc, zap.NewNop()).ServeHTTP(rec, req)
@@ -182,12 +196,14 @@ func TestUploadOrderAuthorization(t *testing.T) {
 			code:   http.StatusAccepted,
 		},
 	}
+
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			svc := NewMockOrderService(gomock.NewController(t))
 			if tc.code == http.StatusAccepted {
 				svc.EXPECT().Upload(gomock.Any(), int64(7), "18").Return(true, nil)
 			}
+
 			req := httptest.NewRequest(http.MethodPost, "/api/user/orders", strings.NewReader("18"))
 			req.Header.Set("Authorization", tc.header)
 			rec := httptest.NewRecorder()
@@ -218,42 +234,53 @@ func TestUploadOrderContext(t *testing.T) {
 				parent, cancel = context.WithTimeout(parent, time.Second)
 				defer cancel()
 			}
+
 			if tc.canceled {
 				var cancel context.CancelFunc
 				parent, cancel = context.WithCancel(parent)
 				cancel()
 			}
+
 			req := httptest.NewRequest(http.MethodPost, "/api/user/orders", strings.NewReader("18"))
 			req = req.WithContext(requestcontext.NewUser().WithID(parent, 7))
 			storage := mock.NewMockDBStorage(gomock.NewController(t))
 			var operation context.Context
 			before := time.Now()
-			check := storage.EXPECT().UserExists(gomock.Any(), int64(7)).DoAndReturn(func(ctx context.Context, id int64) (bool, error) {
-				operation = ctx
-				deadline, ok := ctx.Deadline()
-				require.True(t, ok)
-				require.WithinRange(t, deadline, before, time.Now().Add(25*time.Second))
-				if tc.early {
-					expected, _ := parent.Deadline()
-					require.Equal(t, expected, deadline)
-				}
-				if tc.canceled {
-					require.ErrorIs(t, ctx.Err(), context.Canceled)
-					return false, ctx.Err()
-				}
-				if !tc.early {
-					require.WithinDuration(t, before.Add(25*time.Second), deadline, time.Second)
-				}
-				return true, nil
-			})
-			if !tc.canceled {
-				storage.EXPECT().AddOrder(gomock.Any(), int64(7), "18").DoAndReturn(func(ctx context.Context, id int64, number string) (bool, error) {
-					require.Equal(t, operation, ctx)
+			check := storage.EXPECT().UserExists(gomock.Any(), int64(7)).
+				DoAndReturn(func(ctx context.Context, id int64) (bool, error) {
+					operation = ctx
+					deadline, ok := ctx.Deadline()
+					require.True(t, ok)
+					require.WithinRange(t, deadline, before, time.Now().Add(25*time.Second))
+					if tc.early {
+						expected, _ := parent.Deadline()
+						require.Equal(t, expected, deadline)
+					}
+
+					if tc.canceled {
+						require.ErrorIs(t, ctx.Err(), context.Canceled)
+						return false, ctx.Err()
+					}
+
+					if !tc.early {
+						require.WithinDuration(t, before.Add(25*time.Second), deadline, time.Second)
+					}
+
 					return true, nil
-				}).After(check)
+				})
+			if !tc.canceled {
+				storage.EXPECT().AddOrder(gomock.Any(), int64(7), "18").
+					DoAndReturn(func(ctx context.Context, id int64, number string) (bool, error) {
+						require.Equal(t, operation, ctx)
+						return true, nil
+					}).After(check)
 			}
+
 			rec := httptest.NewRecorder()
-			handler.NewUploadOrder(service.NewOrder(storage, service.NewOrderNumberValidator()), zap.NewNop()).ServeHTTP(rec, req)
+			handler.NewUploadOrder(
+				service.NewOrder(storage, service.NewOrderNumberValidator()),
+				zap.NewNop(),
+			).ServeHTTP(rec, req)
 			require.ErrorIs(t, operation.Err(), context.Canceled)
 			if tc.canceled {
 				require.Equal(t, http.StatusInternalServerError, rec.Code)

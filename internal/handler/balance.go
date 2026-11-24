@@ -1,3 +1,5 @@
+//go:generate go run go.uber.org/mock/mockgen@v0.6.0 -source=balance.go -destination=balance_mock_test.go -package=handler_test
+
 package handler
 
 import (
@@ -12,14 +14,10 @@ import (
 	"github.com/EvgeniyAleksandrov/gophermart/internal/service/mapper"
 )
 
-//go:generate go run go.uber.org/mock/mockgen@v0.6.0 -source=balance.go -destination=balance_mock_test.go -package=handler_test
-
-// BalanceService supplies a checked user balance.
 type BalanceService interface {
 	Get(context.Context, int64) (model.Balance, error)
 }
 
-// Balance handles GET /api/user/balance.
 type Balance struct {
 	service     BalanceService
 	mapper      *mapper.Balance
@@ -27,7 +25,6 @@ type Balance struct {
 	logger      interfaces.Logger
 }
 
-// NewBalance receives the balance service and shared logger.
 func NewBalance(service BalanceService, logger interfaces.Logger) *Balance {
 	return &Balance{
 		service:     service,

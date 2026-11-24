@@ -17,55 +17,51 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockProcessor is a mock of Processor interface.
 type MockProcessor struct {
 	ctrl     *gomock.Controller
 	recorder *MockProcessorMockRecorder
 	isgomock struct{}
 }
 
-// MockProcessorMockRecorder is the mock recorder for MockProcessor.
 type MockProcessorMockRecorder struct {
 	mock *MockProcessor
 }
 
-// NewMockProcessor creates a new mock instance.
 func NewMockProcessor(ctrl *gomock.Controller) *MockProcessor {
 	mock := &MockProcessor{ctrl: ctrl}
 	mock.recorder = &MockProcessorMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockProcessor) EXPECT() *MockProcessorMockRecorder {
 	return m.recorder
 }
 
-// Pending mocks base method.
 func (m *MockProcessor) Pending(arg0 context.Context) ([]model.Order, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Pending", arg0)
 	ret0, _ := ret[0].([]model.Order)
 	ret1, _ := ret[1].(error)
+
 	return ret0, ret1
 }
 
-// Pending indicates an expected call of Pending.
 func (mr *MockProcessorMockRecorder) Pending(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Pending", reflect.TypeOf((*MockProcessor)(nil).Pending), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Pending", reflect.TypeOf((*MockProcessor)(nil).
+		Pending), arg0)
 }
 
-// Process mocks base method.
 func (m *MockProcessor) Process(arg0 context.Context, arg1 model.Order) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Process", arg0, arg1)
 	ret0, _ := ret[0].(error)
+
 	return ret0
 }
 
-// Process indicates an expected call of Process.
 func (mr *MockProcessorMockRecorder) Process(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Process", reflect.TypeOf((*MockProcessor)(nil).Process), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Process", reflect.TypeOf((*MockProcessor)(nil).
+		Process), arg0, arg1)
 }

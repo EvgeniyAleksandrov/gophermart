@@ -9,13 +9,11 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// ServerBuilder assembles routes and network settings before application startup.
 type ServerBuilder struct {
 	address string
 	router  *chi.Mux
 }
 
-// NewServerBuilder creates a builder with an empty chi router.
 func NewServerBuilder(address string) *ServerBuilder {
 	return &ServerBuilder{
 		address: address,
@@ -23,8 +21,6 @@ func NewServerBuilder(address string) *ServerBuilder {
 	}
 }
 
-// AddHandler registers a handler after basic validation. Duplicate routes replace
-// their previous handler. Template syntax is checked by chi; typed nils are not detected.
 func (b *ServerBuilder) AddHandler(method, path string, handler http.Handler) error {
 	if err := b.validateMethod(method); err != nil {
 		return fmt.Errorf("validate method: %w", err)
@@ -66,8 +62,6 @@ func (b *ServerBuilder) validatePath(path string) error {
 	return nil
 }
 
-// Build returns a server ready to run, without opening network connections.
-// The current assembly has no fallible steps and returns a nil error.
 func (b *ServerBuilder) Build() (*http.Server, error) {
 	return &http.Server{
 		Addr:              b.address,

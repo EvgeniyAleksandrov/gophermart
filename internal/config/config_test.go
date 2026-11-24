@@ -85,7 +85,6 @@ func TestLoadConfig(t *testing.T) {
 			if tc.wantError {
 				require.Error(t, err)
 				require.NotContains(t, err.Error(), "test-secret")
-
 				return
 			}
 
@@ -160,6 +159,7 @@ func TestLoadConfigJWTSecret(t *testing.T) {
 			if tc.provided {
 				environment["JWT_SECRET"] = tc.secret
 			}
+
 			setConfigProcess(t, environment, nil)
 
 			cfg, err := config.LoadConfig()
@@ -168,6 +168,7 @@ func TestLoadConfigJWTSecret(t *testing.T) {
 				if tc.secret != "" {
 					require.NotContains(t, err.Error(), tc.secret)
 				}
+
 				return
 			}
 
@@ -178,6 +179,7 @@ func TestLoadConfigJWTSecret(t *testing.T) {
 				next, err := config.LoadConfig()
 				require.NoError(t, err)
 				require.NotEqual(t, cfg.JWTSecret, next.JWTSecret)
+
 				return
 			}
 

@@ -18,6 +18,7 @@ import (
 
 func TestRetryerDo(t *testing.T) {
 	failure := &pgconn.PgError{Code: "40001"}
+
 	for name, tc := range map[string]struct {
 		failures     int
 		operationErr error
@@ -40,9 +41,9 @@ func TestRetryerDo(t *testing.T) {
 		},
 		"unmatched returns original error": {
 			failures:     1,
-			operationErr: operationFailure,
+			operationErr: errOperation,
 			wantCalls:    1,
-			wantErr:      operationFailure,
+			wantErr:      errOperation,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -54,6 +55,7 @@ func TestRetryerDo(t *testing.T) {
 				if calls <= tc.failures {
 					return tc.operationErr
 				}
+
 				return nil
 			})
 			require.Equal(t, tc.wantCalls, calls)
@@ -62,10 +64,11 @@ func TestRetryerDo(t *testing.T) {
 	}
 }
 
-var operationFailure = errors.New("operation failed")
+var errOperation = errors.New("operation failed")
 
 func TestRetryerSafetyBeforeStrategy(t *testing.T) {
 	failure := errors.New("uncertain write")
+
 	for name, tc := range map[string]struct {
 		err error
 	}{
@@ -120,13 +123,17 @@ func TestRetryerCancellation(t *testing.T) {
 				} else {
 					ctx, cancel = context.WithCancel(context.Background())
 				}
+
 				defer cancel()
+
 				if tc.before {
 					cancel()
 				}
+
 				if !tc.before && !tc.duringOperation {
-					policy.EXPECT().Next(1, operationFailure).Return(time.Hour, true)
+					policy.EXPECT().Next(1, errOperation).Return(time.Hour, true)
 				}
+
 				calls := 0
 				done := make(chan error, 1)
 				go func() {
@@ -135,19 +142,22 @@ func TestRetryerCancellation(t *testing.T) {
 						if tc.duringOperation {
 							cancel()
 						}
-						return operationFailure
+
+						return errOperation
 					})
 				}()
 				synctest.Wait()
 				if !tc.deadline {
 					cancel()
 				}
+
 				err := <-done
 				if tc.deadline {
 					require.ErrorIs(t, err, context.DeadlineExceeded)
 				} else {
 					require.ErrorIs(t, err, context.Canceled)
 				}
+
 				if tc.before {
 					require.Zero(t, calls)
 				} else {
@@ -162,14 +172,17 @@ func TestRetryerWaitsAndReturnsLastError(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		policy := NewMockStrategy(gomock.NewController(t))
 		first, last := errors.New("first attempt"), errors.New("last attempt")
-		gomock.InOrder(policy.EXPECT().Next(1, first).Return(2*time.Second, true), policy.EXPECT().Next(2, last).Return(time.Duration(0), false))
+		gomock.InOrder(policy.EXPECT().Next(1, first).
+			Return(2*time.Second, true), policy.EXPECT().Next(2, last).Return(time.Duration(0), false))
 		started, calls := time.Now(), 0
 		err := retry.NewRetryer(policy).Do(context.Background(), func() error {
 			calls++
 			if calls == 1 {
 				return first
 			}
+
 			require.Equal(t, 2*time.Second, time.Since(started))
+
 			return last
 		})
 		require.Same(t, last, err)
@@ -181,6 +194,7 @@ func TestRetryerConcurrentCallsHaveSeparateBudgets(t *testing.T) {
 	require.NoError(t, err)
 	runner := retry.NewRetryer(policy)
 	var group sync.WaitGroup
+
 	for i := 0; i < 10; i++ {
 		group.Go(func() {
 			calls := 0
@@ -190,5 +204,6 @@ func TestRetryerConcurrentCallsHaveSeparateBudgets(t *testing.T) {
 			require.Equal(t, 5, calls)
 		})
 	}
+
 	group.Wait()
 }

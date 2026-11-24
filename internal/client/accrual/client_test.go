@@ -110,16 +110,20 @@ func TestClientFetch(t *testing.T) {
 				if tc.code != 0 {
 					w.WriteHeader(tc.code)
 				}
+
 				fmt.Fprint(w, tc.body)
 			}))
 			defer server.Close()
-			got, err := accrual.NewClient(server.URL+"/", server.Client(), oneAttempt(t)).Fetch(context.Background(), "18")
+
+			got, err := accrual.NewClient(server.URL+"/", server.Client(), oneAttempt(t)).
+				Fetch(context.Background(), "18")
 			require.Equal(t, 1, calls)
 			if tc.err != nil {
 				require.ErrorIs(t, err, tc.err)
 				require.Zero(t, got)
 				return
 			}
+
 			require.NoError(t, err)
 			require.Equal(t, tc.want, got)
 		})
@@ -170,7 +174,9 @@ func TestClientRateLimit(t *testing.T) {
 				w.WriteHeader(429)
 			}))
 			defer server.Close()
-			_, err := accrual.NewClient(server.URL, server.Client(), oneAttempt(t)).Fetch(context.Background(), "18")
+
+			_, err := accrual.NewClient(server.URL, server.Client(), oneAttempt(t)).
+				Fetch(context.Background(), "18")
 			var limited *model.RateLimitError
 			require.ErrorAs(t, err, &limited)
 			require.Equal(t, tc.want, limited.RetryAfter)
@@ -180,8 +186,12 @@ func TestClientRateLimit(t *testing.T) {
 }
 
 func TestClientCancellationAndTimeout(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { <-r.Context().Done() }))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().
+			Done()
+	}))
 	defer server.Close()
+
 	client := accrual.NewClient(server.URL, &http.Client{Timeout: 20 * time.Millisecond}, oneAttempt(t))
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -238,8 +248,10 @@ func TestClientClosesBody(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			body := &trackedBody{Reader: strings.NewReader(tc.body), closeErr: tc.closeErr}
 			doer := NewMockHTTPDoer(gomock.NewController(t))
-			doer.EXPECT().Do(gomock.Any()).Return(&http.Response{StatusCode: tc.code, Body: body, Header: make(http.Header)}, nil)
-			got, err := accrual.NewClient("http://accrual.test", doer, oneAttempt(t)).Fetch(context.Background(), "18")
+			doer.EXPECT().Do(gomock.Any()).
+				Return(&http.Response{StatusCode: tc.code, Body: body, Header: make(http.Header)}, nil)
+			got, err := accrual.NewClient("http://accrual.test", doer, oneAttempt(t)).
+				Fetch(context.Background(), "18")
 			require.True(t, body.closed)
 			if tc.closeErr != nil {
 				require.ErrorIs(t, err, tc.closeErr)
@@ -253,6 +265,7 @@ func oneAttempt(t *testing.T) *retry.Retryer {
 	t.Helper()
 	policy, err := strategy.NewExponential(1, 0, time.Second, strategy.NewSQLState(nil))
 	require.NoError(t, err)
+
 	return retry.NewRetryer(policy)
 }
 
@@ -265,25 +278,35 @@ func TestClientRetriesRateLimitAndClosesEachAttempt(t *testing.T) {
 		started := time.Now()
 		var previous *http.Request
 		calls := 0
-		doer.EXPECT().Do(gomock.Any()).Times(3).DoAndReturn(func(request *http.Request) (*http.Response, error) {
-			require.NotSame(t, previous, request, "each attempt creates its own request")
-			require.Equal(t, "/api/orders/18", request.URL.Path)
-			require.Empty(t, request.Header.Get("Authorization"))
-			previous = request
-			calls++
-			switch calls {
-			case 1:
-				return &http.Response{StatusCode: 429, Header: http.Header{"Retry-After": []string{"60"}}, Body: first}, nil
-			case 2:
-				require.True(t, first.closed)
-				require.Equal(t, time.Minute, time.Since(started))
-				return &http.Response{StatusCode: 429, Header: http.Header{"Retry-After": []string{"20"}}, Body: second}, nil
-			default:
-				require.True(t, second.closed)
-				require.Equal(t, 80*time.Second, time.Since(started))
-				return &http.Response{StatusCode: 200, Header: make(http.Header), Body: final}, nil
-			}
-		})
+		doer.EXPECT().Do(gomock.Any()).Times(3).
+			DoAndReturn(func(request *http.Request) (*http.Response, error) {
+				require.NotSame(t, previous, request, "each attempt creates its own request")
+				require.Equal(t, "/api/orders/18", request.URL.Path)
+				require.Empty(t, request.Header.Get("Authorization"))
+				previous = request
+				calls++
+
+				switch calls {
+				case 1:
+					return &http.Response{
+						StatusCode: 429,
+						Header:     http.Header{"Retry-After": []string{"60"}},
+						Body:       first,
+					}, nil
+				case 2:
+					require.True(t, first.closed)
+					require.Equal(t, time.Minute, time.Since(started))
+					return &http.Response{
+						StatusCode: 429,
+						Header:     http.Header{"Retry-After": []string{"20"}},
+						Body:       second,
+					}, nil
+				default:
+					require.True(t, second.closed)
+					require.Equal(t, 80*time.Second, time.Since(started))
+					return &http.Response{StatusCode: 200, Header: make(http.Header), Body: final}, nil
+				}
+			})
 		client := accrual.NewClient("http://accrual.test", doer, retry.NewRetryer(strategy.NewRateLimit()))
 		result, err := client.Fetch(context.Background(), "18")
 		require.NoError(t, err)
@@ -296,9 +319,18 @@ func TestClientRateLimitCancellation(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		doer := NewMockHTTPDoer(gomock.NewController(t))
 		body := &trackedBody{Reader: strings.NewReader("")}
-		doer.EXPECT().Do(gomock.Any()).Return(&http.Response{StatusCode: 429, Header: http.Header{"Retry-After": []string{"60"}}, Body: body}, nil)
+		doer.EXPECT().Do(gomock.Any()).
+			Return(
+				&http.Response{
+					StatusCode: 429,
+					Header:     http.Header{"Retry-After": []string{"60"}},
+					Body:       body,
+				},
+				nil,
+			)
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+
 		client := accrual.NewClient("http://accrual.test", doer, retry.NewRetryer(strategy.NewRateLimit()))
 		done := make(chan error, 1)
 		go func() {
@@ -322,9 +354,11 @@ func TestClientStopsOnUnmatchedResponseAfterRateLimit(t *testing.T) {
 			w.WriteHeader(429)
 			return
 		}
+
 		w.WriteHeader(500)
 	}))
 	defer server.Close()
+
 	client := accrual.NewClient(server.URL, server.Client(), retry.NewRetryer(strategy.NewRateLimit()))
 	result, err := client.Fetch(context.Background(), "18")
 	require.ErrorIs(t, err, model.ErrAccrualUnavailable)

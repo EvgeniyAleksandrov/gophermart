@@ -86,6 +86,7 @@ func TestAmountParser(t *testing.T) {
 				require.ErrorIs(t, err, model.ErrAccrualInvalidResponse)
 				return
 			}
+
 			require.NoError(t, err)
 			require.Equal(t, tc.want, got)
 		})

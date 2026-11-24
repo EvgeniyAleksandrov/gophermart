@@ -11,14 +11,12 @@ import (
 	"github.com/EvgeniyAleksandrov/gophermart/internal/requestcontext"
 )
 
-// UploadOrder handles POST /api/user/orders.
 type UploadOrder struct {
 	service     OrderService
 	userContext *requestcontext.User
 	logger      interfaces.Logger
 }
 
-// NewUploadOrder receives the order service and shared logger.
 func NewUploadOrder(service OrderService, logger interfaces.Logger) *UploadOrder {
 	return &UploadOrder{
 		service:     service,
@@ -48,6 +46,7 @@ func (h *UploadOrder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	created, err := h.service.Upload(ctx, userID, string(body))
+
 	switch {
 	case errors.Is(err, model.ErrEmptyOrderNumber):
 		http.Error(w, "invalid request", http.StatusBadRequest)

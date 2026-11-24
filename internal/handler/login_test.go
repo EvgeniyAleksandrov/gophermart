@@ -138,17 +138,20 @@ func TestLoginInput(t *testing.T) {
 			h := handler.NewLogin(service, zap.NewNop())
 			request := httptest.NewRequest(http.MethodPost, "/api/user/login", strings.NewReader(tc.body))
 			request.Header.Set("Content-Type", tc.contentType)
+
 			var operationCtx context.Context
 			before := time.Now()
 			if tc.login != "" {
-				service.EXPECT().Login(gomock.Any(), tc.login, tc.password).DoAndReturn(func(ctx context.Context, _, _ string) (string, error) {
-					operationCtx = ctx
-					deadline, ok := ctx.Deadline()
-					require.True(t, ok)
-					require.WithinDuration(t, before.Add(25*time.Second), deadline, time.Second)
-					require.NoError(t, ctx.Err())
-					return "signed-token", nil
-				})
+				service.EXPECT().Login(gomock.Any(), tc.login, tc.password).
+					DoAndReturn(func(ctx context.Context, _, _ string) (string, error) {
+						operationCtx = ctx
+						deadline, ok := ctx.Deadline()
+						require.True(t, ok)
+						require.WithinDuration(t, before.Add(25*time.Second), deadline, time.Second)
+						require.NoError(t, ctx.Err())
+
+						return "signed-token", nil
+					})
 			}
 
 			response := httptest.NewRecorder()
@@ -157,6 +160,7 @@ func TestLoginInput(t *testing.T) {
 				require.Equal(t, http.StatusBadRequest, response.Code)
 				require.Equal(t, "invalid request\n", response.Body.String())
 				require.Empty(t, response.Header().Get("Authorization"))
+
 				return
 			}
 
@@ -206,7 +210,11 @@ func TestLoginServiceErrors(t *testing.T) {
 			service.EXPECT().Login(gomock.Any(), "Alice", "secret").Return("must-not-leak", tc.err)
 			core, logs := observer.New(zap.ErrorLevel)
 			h := handler.NewLogin(service, zap.New(core))
-			request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"login":"Alice","password":"secret"}`))
+			request := httptest.NewRequest(
+				http.MethodPost,
+				"/",
+				strings.NewReader(`{"login":"Alice","password":"secret"}`),
+			)
 			response := httptest.NewRecorder()
 
 			h.ServeHTTP(response, request)
@@ -226,7 +234,8 @@ func TestLoginServiceErrors(t *testing.T) {
 	}
 }
 
-type loginFailedBody struct{}
+type loginFailedBody struct {
+}
 
 func (b *loginFailedBody) Read([]byte) (int, error) {
 	return 0, io.ErrUnexpectedEOF
@@ -251,15 +260,21 @@ func TestLoginPreserveParentContext(t *testing.T) {
 	parent, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
 	cancel()
 	service := NewMockAuthService(gomock.NewController(t))
-	service.EXPECT().Login(gomock.Any(), "Alice", "secret").DoAndReturn(func(ctx context.Context, _, _ string) (string, error) {
-		deadline, _ := ctx.Deadline()
-		parentDeadline, _ := parent.Deadline()
-		require.Equal(t, parentDeadline, deadline)
-		require.ErrorIs(t, ctx.Err(), context.Canceled)
-		return "", ctx.Err()
-	})
+	service.EXPECT().Login(gomock.Any(), "Alice", "secret").
+		DoAndReturn(func(ctx context.Context, _, _ string) (string, error) {
+			deadline, _ := ctx.Deadline()
+			parentDeadline, _ := parent.Deadline()
+			require.Equal(t, parentDeadline, deadline)
+			require.ErrorIs(t, ctx.Err(), context.Canceled)
+
+			return "", ctx.Err()
+		})
 	h := handler.NewLogin(service, zap.NewNop())
-	request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(`{"login":"Alice","password":"secret"}`)).WithContext(parent)
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/",
+		strings.NewReader(`{"login":"Alice","password":"secret"}`),
+	).WithContext(parent)
 	response := httptest.NewRecorder()
 
 	h.ServeHTTP(response, request)

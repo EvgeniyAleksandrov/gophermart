@@ -66,17 +66,23 @@ func TestListOrdersResponses(t *testing.T) {
 			body: `[{"number":"18","status":"NEW","uploaded_at":"2026-11-22T09:00:00Z"},{"number":"0","status":"PROCESSING","uploaded_at":"2026-11-22T08:00:00Z"}]`,
 		},
 	}
+
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			svc := NewMockOrderService(gomock.NewController(t))
 			svc.EXPECT().List(gomock.Any(), int64(7)).Return(tc.orders, tc.err)
-			req := httptest.NewRequest(http.MethodGet, "/api/user/orders?user_id=99", strings.NewReader(`{"user_id":99}`))
+			req := httptest.NewRequest(
+				http.MethodGet,
+				"/api/user/orders?user_id=99",
+				strings.NewReader(`{"user_id":99}`),
+			)
 			req = req.WithContext(requestcontext.NewUser().WithID(req.Context(), 7))
 			rec := httptest.NewRecorder()
 			handler.NewListOrders(svc, zap.NewNop()).ServeHTTP(rec, req)
 			require.Equal(t, tc.code, rec.Code)
 			require.Equal(t, tc.body, rec.Body.String())
 			require.Empty(t, rec.Header().Get("Authorization"))
+
 			switch tc.code {
 			case http.StatusOK:
 				require.Equal(t, "application/json", rec.Header().Get("Content-Type"))
@@ -110,12 +116,14 @@ func TestListOrdersAuthorization(t *testing.T) {
 			code:   http.StatusNoContent,
 		},
 	}
+
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			svc := NewMockOrderService(gomock.NewController(t))
 			if tc.code == http.StatusNoContent {
 				svc.EXPECT().List(gomock.Any(), int64(7)).Return(nil, nil)
 			}
+
 			req := httptest.NewRequest(http.MethodGet, "/api/user/orders", nil)
 			req.Header.Set("Authorization", tc.header)
 			rec := httptest.NewRecorder()
@@ -146,30 +154,35 @@ func TestListOrdersContext(t *testing.T) {
 				parent, cancel = context.WithTimeout(parent, time.Second)
 				defer cancel()
 			}
+
 			if tc.canceled {
 				var cancel context.CancelFunc
 				parent, cancel = context.WithCancel(parent)
 				cancel()
 			}
+
 			svc := NewMockOrderService(gomock.NewController(t))
 			var operation context.Context
 			before := time.Now()
-			svc.EXPECT().List(gomock.Any(), int64(7)).DoAndReturn(func(ctx context.Context, id int64) ([]model.Order, error) {
-				operation = ctx
-				deadline, ok := ctx.Deadline()
-				require.True(t, ok)
-				if tc.early {
-					expected, _ := parent.Deadline()
-					require.Equal(t, expected, deadline)
-				} else {
-					require.WithinDuration(t, before.Add(25*time.Second), deadline, time.Second)
-				}
-				if tc.canceled {
-					require.ErrorIs(t, ctx.Err(), context.Canceled)
-					return nil, ctx.Err()
-				}
-				return nil, nil
-			})
+			svc.EXPECT().List(gomock.Any(), int64(7)).
+				DoAndReturn(func(ctx context.Context, id int64) ([]model.Order, error) {
+					operation = ctx
+					deadline, ok := ctx.Deadline()
+					require.True(t, ok)
+					if tc.early {
+						expected, _ := parent.Deadline()
+						require.Equal(t, expected, deadline)
+					} else {
+						require.WithinDuration(t, before.Add(25*time.Second), deadline, time.Second)
+					}
+
+					if tc.canceled {
+						require.ErrorIs(t, ctx.Err(), context.Canceled)
+						return nil, ctx.Err()
+					}
+
+					return nil, nil
+				})
 			req := httptest.NewRequest(http.MethodGet, "/api/user/orders", nil)
 			req = req.WithContext(requestcontext.NewUser().WithID(parent, 7))
 			rec := httptest.NewRecorder()
@@ -200,6 +213,7 @@ func TestOrderHandlersRequireContextUser(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			svc := NewMockOrderService(gomock.NewController(t))
+
 			for method, h := range map[string]http.Handler{
 				http.MethodGet:  handler.NewListOrders(svc, zap.NewNop()),
 				http.MethodPost: handler.NewUploadOrder(svc, zap.NewNop()),
@@ -208,6 +222,7 @@ func TestOrderHandlersRequireContextUser(t *testing.T) {
 				if tc.attach {
 					req = req.WithContext(requestcontext.NewUser().WithID(req.Context(), tc.id))
 				}
+
 				rec := httptest.NewRecorder()
 				h.ServeHTTP(rec, req)
 				require.Equal(t, http.StatusUnauthorized, rec.Code)
@@ -217,7 +232,6 @@ func TestOrderHandlersRequireContextUser(t *testing.T) {
 	}
 }
 
-// failedOrderWriter simulates a disconnected client after headers were sent.
 type failedOrderWriter struct {
 	header   http.Header
 	statuses []int
@@ -239,7 +253,8 @@ func (w *failedOrderWriter) Write(body []byte) (int, error) {
 
 func TestListOrdersWriteFailure(t *testing.T) {
 	svc := NewMockOrderService(gomock.NewController(t))
-	svc.EXPECT().List(gomock.Any(), int64(7)).Return([]model.Order{{Number: "18", Status: model.OrderStatusNew}}, nil)
+	svc.EXPECT().List(gomock.Any(), int64(7)).
+		Return([]model.Order{{Number: "18", Status: model.OrderStatusNew}}, nil)
 	req := httptest.NewRequest(http.MethodGet, "/api/user/orders", nil)
 	req = req.WithContext(requestcontext.NewUser().WithID(req.Context(), 7))
 	writer := &failedOrderWriter{header: make(http.Header)}

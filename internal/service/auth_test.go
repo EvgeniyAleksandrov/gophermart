@@ -73,7 +73,9 @@ func TestAuthServiceRegister(t *testing.T) {
 
 			if tc.login != "" && tc.password != "" {
 				hash := hasher.EXPECT().Hash(tc.password).Return("hash")
-				create := storage.EXPECT().AddUser(ctx, tc.login, "hash").Return(model.User{ID: 42}, tc.storageErr).After(hash)
+				create := storage.EXPECT().AddUser(ctx, tc.login, "hash").
+					Return(model.User{ID: 42}, tc.storageErr).
+					After(hash)
 				if tc.storageErr == nil {
 					tokens.EXPECT().Issue(int64(42)).Return("token", tc.tokenErr).After(create)
 				}
@@ -161,7 +163,8 @@ func TestAuthServiceLogin(t *testing.T) {
 			defer cancel()
 
 			if tc.login != "" && tc.password != "" {
-				find := storage.EXPECT().FindUserByLogin(ctx, tc.login).Return(model.User{ID: 42, PasswordHash: "hash"}, tc.storageErr)
+				find := storage.EXPECT().FindUserByLogin(ctx, tc.login).
+					Return(model.User{ID: 42, PasswordHash: "hash"}, tc.storageErr)
 				if tc.storageErr == nil {
 					match := hasher.EXPECT().Matches(tc.password, "hash").Return(tc.matches).After(find)
 					if tc.matches {

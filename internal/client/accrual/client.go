@@ -1,3 +1,5 @@
+//go:generate go run go.uber.org/mock/mockgen@v0.6.0 -source=client.go -destination=client_mock_test.go -package=accrual_test
+
 // Package accrual implements the external accrual HTTP protocol.
 package accrual
 
@@ -14,15 +16,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/EvgeniyAleksandrov/gophermart/internal/dto"
 	"github.com/EvgeniyAleksandrov/gophermart/internal/interfaces"
 	"github.com/EvgeniyAleksandrov/gophermart/internal/model"
 )
 
 const accrualRateLimitFallback = 20 * time.Second
 
-//go:generate go run go.uber.org/mock/mockgen@v0.6.0 -source=client.go -destination=client_mock_test.go -package=accrual_test
-
-// HTTPDoer executes one request using a reusable transport.
 type HTTPDoer interface {
 	Do(*http.Request) (*http.Response, error)
 }
@@ -35,13 +35,15 @@ type Client struct {
 	retryer interfaces.Retryer
 }
 
-// NewClient receives a validated base URL, shared HTTP client and retryer.
 func NewClient(baseURL string, client HTTPDoer, retryer interfaces.Retryer) *Client {
-	return &Client{baseURL: strings.TrimRight(baseURL, "/"), http: client, parser: NewAmountParser(), retryer: retryer}
+	return &Client{
+		baseURL: strings.TrimRight(baseURL, "/"),
+		http:    client,
+		parser:  NewAmountParser(),
+		retryer: retryer,
+	}
 }
 
-// Fetch retries complete requests according to the injected policy, validates
-// the final response and never forwards user authorization.
 func (c *Client) Fetch(ctx context.Context, number string) (model.AccrualResult, error) {
 	var result model.AccrualResult
 	err := c.retryer.Do(ctx, func() error {
@@ -50,19 +52,27 @@ func (c *Client) Fetch(ctx context.Context, number string) (model.AccrualResult,
 		if err == nil {
 			result = fetched
 		}
+
 		return err
 	})
 	if err != nil {
 		return model.AccrualResult{}, err
 	}
+
 	return result, nil
 }
 
 func (c *Client) fetch(ctx context.Context, number string) (result model.AccrualResult, err error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/api/orders/"+url.PathEscape(number), nil)
+	request, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		c.baseURL+"/api/orders/"+url.PathEscape(number),
+		nil,
+	)
 	if err != nil {
 		return model.AccrualResult{}, errors.Join(model.ErrAccrualUnavailable, err)
 	}
+
 	response, err := c.http.Do(request)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -71,6 +81,7 @@ func (c *Client) fetch(ctx context.Context, number string) (result model.Accrual
 
 		return model.AccrualResult{}, errors.Join(model.ErrAccrualUnavailable, err)
 	}
+
 	defer func() {
 		if ctx.Err() != nil {
 			err = ctx.Err()
@@ -84,6 +95,7 @@ func (c *Client) fetch(ctx context.Context, number string) (result model.Accrual
 			result = model.AccrualResult{}
 		}
 	}()
+
 	switch response.StatusCode {
 	case http.StatusNoContent:
 		return model.AccrualResult{}, model.ErrAccrualNotRegistered
@@ -94,9 +106,9 @@ func (c *Client) fetch(ctx context.Context, number string) (result model.Accrual
 		return model.AccrualResult{}, model.ErrAccrualUnavailable
 	}
 
-	var dto *responseDTO
+	var responseData *dto.AccrualResponse
 	decoder := json.NewDecoder(response.Body)
-	if err := decoder.Decode(&dto); err != nil {
+	if err := decoder.Decode(&responseData); err != nil {
 		if ctx.Err() != nil {
 			return model.AccrualResult{}, ctx.Err()
 		}
@@ -119,15 +131,17 @@ func (c *Client) fetch(ctx context.Context, number string) (result model.Accrual
 		return model.AccrualResult{}, model.ErrAccrualInvalidResponse
 	}
 
-	if dto == nil || dto.Order != number {
+	if responseData == nil || responseData.Order != number {
 		return model.AccrualResult{}, model.ErrAccrualInvalidResponse
 	}
-	amount, err := c.parser.Parse(dto.Accrual)
+
+	amount, err := c.parser.Parse(responseData.Accrual)
 	if err != nil {
 		return model.AccrualResult{}, err
 	}
 
-	status := model.AccrualStatus(dto.Status)
+	status := model.AccrualStatus(responseData.Status)
+
 	switch status {
 	case model.AccrualRegistered, model.AccrualProcessing, model.AccrualInvalid:
 		amount = 0
@@ -149,6 +163,7 @@ func (c *Client) retryAfter(raw string) time.Duration {
 			return accrualRateLimitFallback
 		}
 	}
+
 	seconds, err := strconv.ParseUint(raw, 10, 64)
 	if err != nil || seconds > uint64(math.MaxInt64/int64(time.Second)) {
 		return accrualRateLimitFallback
