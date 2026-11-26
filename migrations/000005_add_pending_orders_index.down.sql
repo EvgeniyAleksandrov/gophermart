@@ -1,0 +1,1 @@
+DROP INDEX public.gophermart_orders_pending_id_idx;
